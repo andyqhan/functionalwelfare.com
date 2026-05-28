@@ -10,7 +10,10 @@
   --cap-margin: 11rem;       /* left gutter for figure captions (wide screens) */
   --gap: 1.5rem;
   --sidebar-w: 13.5rem;
-  --hdr-breakout: clamp(0rem, 3vw, 4rem); /* title block extends past the paper */
+  /* Title block extends past the paper toward the window edges. Derived from
+     available space (50vw − sidebar/2 − paper/2 − gap) so it never collides
+     with the sidebar; capped so it stops ~2rem from each edge. */
+  --hdr-breakout: clamp(0rem, calc(50vw - 39rem), 10rem);
 
   --ink: #272622;
   --muted: #6f7178;

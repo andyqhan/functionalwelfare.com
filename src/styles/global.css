@@ -1,14 +1,15 @@
 /* ===========================================================================
    functionalwelfare.com — typography & layout.
-   Cardo throughout · wide justified measure · left figure captions ·
-   right-margin sidenotes & references · responsive down to mobile.
+   Cardo · wide justified measure · left-hanging figure captions · right-margin
+   footnotes · hover-popover citations · responsive to mobile.
    =========================================================================== */
 
 :root {
-  --measure: 41rem;          /* main reading column */
-  --note-margin: 14rem;      /* right margin for sidenotes + references */
-  --gap: 2rem;               /* space between text and margin */
-  --sidebar-w: 16rem;
+  --measure: 37rem;          /* main reading column */
+  --note-margin: 11rem;      /* right margin for footnote sidenotes */
+  --cap-margin: 11rem;       /* left gutter for figure captions (wide screens) */
+  --gap: 1.5rem;
+  --sidebar-w: 13.5rem;
 
   --ink: #272622;
   --muted: #6f7178;
@@ -28,7 +29,7 @@
 * { box-sizing: border-box; }
 
 html {
-  font-size: 18px;           /* global scale; everything sizes in rem off this */
+  font-size: 18px;
   scroll-behavior: smooth;
   scroll-padding-top: 1.5rem;
   -webkit-text-size-adjust: 100%;
@@ -39,7 +40,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 1.18rem;        /* ~21px reading text */
+  font-size: 1.19rem;
   line-height: 1.6;
   overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
@@ -53,51 +54,45 @@ body {
   inset: 0 auto 0 0;
   width: var(--sidebar-w);
   overflow-y: auto;
-  padding: 2.2rem 1.1rem 3rem 1.6rem;
+  padding: 2.2rem 1rem 3rem 1.5rem;
   border-right: 1px solid var(--rule);
   background: #faf9f5;
 }
 .content {
   margin-left: var(--sidebar-w);
-  padding: 3.5rem clamp(1.5rem, 4vw, 4rem) 8rem;
+  padding: 3.5rem clamp(1.25rem, 3vw, 3.5rem) 8rem;
 }
 .paper {
   max-width: calc(var(--measure) + var(--gap) + var(--note-margin));
   margin: 0 auto;
 }
 
-/* Reserve the right margin; children then fill the measure automatically. */
+/* Reserve the right margin; children fill the measure automatically. */
 .unit,
 .paper-header { padding-right: calc(var(--note-margin) + var(--gap)); }
 
 /* ------------------------------ headings -------------------------------- */
 
 .paper-title {
-  font-size: 2.4rem;
-  line-height: 1.15;
+  font-size: 2.5rem;
+  line-height: 1.13;
   font-weight: 700;
   margin: 0 0 1.1rem;
   letter-spacing: -0.012em;
   text-wrap: balance;
 }
 .heading { font-weight: 700; line-height: 1.22; scroll-margin-top: 1.5rem; text-wrap: pretty; }
-.heading.lvl-1 { font-size: 1.75rem; margin: 3rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
-.heading.lvl-2 { font-size: 1.3rem; margin: 2.1rem 0 0.6rem; }
+.heading.lvl-1 { font-size: 1.78rem; margin: 3rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
+.heading.lvl-2 { font-size: 1.32rem; margin: 2.1rem 0 0.6rem; }
 .heading.lvl-3 { font-size: 1.1rem; margin: 1.6rem 0 0.5rem; }
 .heading.lvl-4 { font-size: 1rem; margin: 1.3rem 0 0.4rem; font-style: italic; }
-.sec-num { color: var(--accent); font-weight: 700; margin-right: 0.45em; }
+.sec-num { color: var(--accent); font-weight: 700; margin-right: 0.4em; }
 .anchor { opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none; font-size: 0.8em; transition: opacity 0.15s; }
 .heading:hover .anchor { opacity: 0.5; }
 
 /* -------------------------------- text ---------------------------------- */
 
-p {
-  margin: 0 0 1.05rem;
-  text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
-  hyphenate-limit-chars: 6 3 2;
-}
+p { margin: 0 0 1.05rem; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; }
 a { color: var(--accent-deep); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .sc { font-variant: small-caps; letter-spacing: 0.02em; }
@@ -110,11 +105,7 @@ li { margin: 0.2rem 0; text-align: justify; hyphens: auto; }
 
 code, .mono { font-family: var(--mono); font-size: 0.82em; font-feature-settings: "liga" 0, "calt" 0; }
 code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
-.tok {
-  font-family: var(--mono); font-size: 0.8em; background: #eef0f3;
-  border: 1px solid #e0e3e8; border-radius: 3px; padding: 0.02em 0.3em; white-space: pre;
-  font-feature-settings: "liga" 0, "calt" 0;
-}
+.tok { font-family: var(--mono); font-size: 0.8em; background: #eef0f3; border: 1px solid #e0e3e8; border-radius: 3px; padding: 0.02em 0.3em; white-space: pre; font-feature-settings: "liga" 0, "calt" 0; }
 
 .hl { padding: 0.05em 0.18em; border-radius: 2px; }
 .hl-red { background: var(--hl-red); }
@@ -122,60 +113,65 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 
 .emoji { height: 1em; width: auto; vertical-align: -0.16em; margin: 0 0.03em; }
 .inline-img { vertical-align: middle; }
-
 .xref { color: var(--accent-deep); white-space: nowrap; }
 
 /* ----------------------- authors / abstract ----------------------------- */
 
-.authors { font-size: 1.12rem; margin-bottom: 0.2rem; }
+.byline { margin-bottom: 0.3rem; }
+.authors { font-size: 1.12rem; }
 .author:not(:last-child)::after { content: " · "; color: var(--muted); }
 .affiliation { color: var(--muted); font-style: italic; }
-.repo { margin-top: 0.45rem; font-size: 0.85rem; }
+.repo { margin-top: 0.2rem; font-size: 0.85rem; }
 .repo a { font-family: var(--mono); }
-.abstract { margin: 1.9rem 0; }
+.abstract { margin: 1.9rem 0; font-size: 0.97em; }
 .abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
-.abstract { font-size: 0.97em; }
 
-.epigraph { margin: 2.2rem 0 1rem; font-style: italic; color: #56554f; text-align: center; }
+.epigraph-wrap { margin-top: 1.6rem; }
+.epigraph { margin: 0; font-style: italic; color: #56554f; text-align: left; }
 .epigraph-line { line-height: 1.5; }
 .epigraph-attr { margin-top: 0.4rem; font-size: 0.85em; }
 
-/* ----------------- sidenotes & margin references ------------------------ */
+/* --------------------------- footnote sidenotes ------------------------- */
 
 .fn-mark { color: var(--accent); font-weight: 700; font-size: 0.7em; }
-.cite { color: var(--accent); }
-.cite-wrap { }
-
 .sidenote {
-  float: right;
-  clear: right;
-  width: var(--note-margin);
+  float: right; clear: right; width: var(--note-margin);
   margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
-  margin-bottom: 0.85rem;
-  font-size: 0.74rem;
-  line-height: 1.42;
-  color: var(--muted);
-  text-align: left;
-  hyphens: auto;
+  margin-bottom: 0.85rem; font-size: 0.74rem; line-height: 1.42;
+  color: var(--muted); text-align: left; hyphens: auto;
 }
 .sidenote .fn-mark { margin-right: 0.3em; }
-.cite-note .ref-item { display: block; margin-bottom: 0.45rem; }
-.cite-note .ref-item:last-child { margin-bottom: 0; }
+
+/* --------------------------- citation popovers -------------------------- */
+
+.cite-wrap { position: relative; }
+.cite { color: var(--accent); cursor: help; border-bottom: 1px dotted currentColor; white-space: nowrap; }
+.cite:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.cite-pop {
+  position: absolute; left: 0; top: 1.5em; z-index: 60;
+  width: max-content; max-width: min(26rem, 86vw);
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 7px;
+  box-shadow: 0 8px 30px rgba(30, 45, 70, 0.17);
+  padding: 0.7rem 0.85rem; font-size: 0.8rem; line-height: 1.42; text-align: left;
+  opacity: 0; visibility: hidden; transform: translateY(-3px);
+  transition: opacity 0.13s ease, transform 0.13s ease; pointer-events: none;
+}
+.cite-wrap:hover .cite-pop,
+.cite-wrap:focus-within .cite-pop { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+.cite-pop .ref-item { display: block; }
+.cite-pop .ref-item + .ref-item { margin-top: 0.5rem; }
 .ref-num { font-weight: 700; color: var(--accent); margin-right: 0.3em; }
 
 /* ------------------------------ figures --------------------------------- */
 
-/* Break figures/tables out to the full width, including the note margin. */
 .unit > .fig,
-.unit > .tbl {
-  margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
-  clear: right;
-}
+.unit > .tbl { margin-right: calc(-1 * (var(--note-margin) + var(--gap))); clear: right; }
 
 .fig {
   display: grid;
-  grid-template-columns: minmax(10rem, 13rem) 1fr;
-  column-gap: 1.8rem;
+  grid-template-columns: minmax(9rem, 12rem) 1fr;
+  column-gap: 1.6rem;
   align-items: start;
   margin: 2.4rem 0;
 }
@@ -197,18 +193,12 @@ figcaption { font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
 .tbl th { font-weight: 700; border-bottom: 1.5px solid var(--ink); }
 .tbl tr:first-child th { border-top: 1.5px solid var(--ink); }
 .tbl .rule-above { border-top: 1px solid var(--rule); }
-.al-left { text-align: left; }
-.al-center { text-align: center; }
-.al-right { text-align: right; }
+.al-left { text-align: left; } .al-center { text-align: center; } .al-right { text-align: right; }
 .tbl-img { max-width: 100%; }
 
 /* --------------------------- model examples ----------------------------- */
 
-.model-example {
-  margin: 1.5rem 0; padding: 0.85rem 1.15rem;
-  background: #f7f7fa; border-left: 3px solid var(--accent);
-  font-size: 0.92em; border-radius: 0 4px 4px 0;
-}
+.model-example { margin: 1.5rem 0; padding: 0.85rem 1.15rem; background: #f7f7fa; border-left: 3px solid var(--accent); font-size: 0.92em; border-radius: 0 4px 4px 0; }
 .model-example > div { margin: 0.35rem 0; }
 .model-example p { text-align: left; }
 .ex-meta { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
@@ -216,12 +206,7 @@ figcaption { font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
 .ex-response { white-space: pre-wrap; }
 
 .callout { margin: 1.5rem 0; padding: 0.85rem 1.15rem; background: var(--accent-soft); border-radius: 5px; font-size: 0.95em; }
-.verbatim {
-  font-family: var(--mono); font-size: 0.78rem; line-height: 1.5;
-  background: #f6f6f2; border: 1px solid var(--rule); border-left: 3px solid var(--accent);
-  padding: 0.85rem 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 0 4px 4px 0;
-  font-feature-settings: "liga" 0, "calt" 0;
-}
+.verbatim { font-family: var(--mono); font-size: 0.78rem; line-height: 1.5; background: #f6f6f2; border: 1px solid var(--rule); border-left: 3px solid var(--accent); padding: 0.85rem 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 0 4px 4px 0; font-feature-settings: "liga" 0, "calt" 0; }
 blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(--rule); color: #4a4943; font-style: italic; }
 
 /* -------------------------------- math ---------------------------------- */
@@ -237,37 +222,60 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 .toc-label { hyphens: manual; }
 .toc-title { display: block; font-weight: 700; font-size: 1.02rem; margin-bottom: 1rem; color: var(--ink); line-height: 1.2; }
 .toc-list { list-style: none; margin: 0; padding: 0; }
-.toc-item > a { display: grid; grid-template-columns: 1.7em 1fr; column-gap: 0.15em; align-items: baseline; padding: 0.2rem 0; color: #45443f; }
+.toc-item > a { display: grid; grid-template-columns: 2.4em 1fr; column-gap: 0.2em; align-items: baseline; padding: 0.2rem 0; color: #45443f; }
 .toc-item.current > a { color: var(--accent-deep); font-weight: 700; }
 .toc-item > a:hover { color: var(--accent-deep); text-decoration: none; }
 .toc-num { color: var(--accent); font-weight: 700; }
-.toc-sub { list-style: none; margin: 0 0 0.35rem; padding-left: 1.7em; }
-.toc-sub a { display: grid; grid-template-columns: 2.3em 1fr; column-gap: 0.15em; align-items: baseline; padding: 0.12rem 0; color: var(--muted); font-size: 0.95em; }
+.toc-sub { list-style: none; margin: 0 0 0.35rem; padding-left: 2.4em; }
+.toc-sub a { display: grid; grid-template-columns: 3.1em 1fr; column-gap: 0.2em; align-items: baseline; padding: 0.12rem 0; color: var(--muted); font-size: 0.95em; }
 .toc-divider { margin: 1.3rem 0 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; }
 
 .appendix-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.88rem; }
 
 /* ------------------------------- toggle --------------------------------- */
 
-#toc-toggle {
-  display: none; position: fixed; top: 0.9rem; left: 0.9rem; z-index: 20;
-  background: var(--paper); border: 1px solid var(--rule); border-radius: 6px;
-  width: 2.5rem; height: 2.5rem; font-size: 1.1rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+#toc-toggle { display: none; position: fixed; top: 0.9rem; left: 0.9rem; z-index: 20; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; width: 2.5rem; height: 2.5rem; font-size: 1.1rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+
+/* ====================== enhanced wide desktop =========================== */
+/* Left caption gutter + two-column title/abstract header. */
+@media (min-width: 1400px) {
+  .paper { max-width: calc(var(--cap-margin) + var(--gap) + var(--measure) + var(--gap) + var(--note-margin)); }
+  .unit { padding-left: calc(var(--cap-margin) + var(--gap)); }
+
+  .unit > .fig {
+    margin-left: calc(-1 * (var(--cap-margin) + var(--gap)));
+    grid-template-columns: var(--cap-margin) 1fr;
+    column-gap: var(--gap);
+  }
+
+  .paper-header {
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 3rem;
+    align-items: start;
+    grid-template-areas: "title abstract" "byline abstract" "repo abstract" "epi abstract";
+  }
+  .paper-title { grid-area: title; margin-top: 0.2rem; }
+  .byline { grid-area: byline; }
+  .repo { grid-area: repo; }
+  .epigraph-wrap { grid-area: epi; }
+  .abstract { grid-area: abstract; margin: 0.2rem 0 0; }
 }
 
 /* ============================ responsive ================================= */
 
-/* No room for the right note margin: notes + refs flow inline. */
-@media (max-width: 1280px) {
+/* No room for the right footnote margin: footnotes flow inline. */
+@media (max-width: 1179px) {
   .unit, .paper-header { padding-right: 0; }
   .paper { max-width: var(--measure); }
   .unit > .fig, .unit > .tbl { margin-right: 0; }
   .sidenote {
     float: none; clear: none; width: auto; display: block;
     margin: 0.7rem 0; padding: 0.55rem 0.9rem; font-size: 0.84rem;
-    background: var(--accent-soft); border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0;
-    color: #50525a;
+    background: var(--accent-soft); border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0; color: #50525a;
   }
+  .cite-pop { font-size: 0.86rem; }
 }
 
 /* Sidebar becomes a drawer. */
@@ -287,9 +295,10 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 /* Phone tightening. */
 @media (max-width: 640px) {
   body { font-size: 1.08rem; line-height: 1.58; }
-  p, li { text-align: left; }            /* avoid loose justification on narrow lines */
-  .paper-title { font-size: 1.9rem; }
+  p, li { text-align: left; }
+  .paper-title { font-size: 1.95rem; }
   .heading.lvl-1 { font-size: 1.5rem; }
   .heading.lvl-2 { font-size: 1.18rem; }
   .tbl table { font-size: 0.76rem; }
+  .cite-pop { position: fixed; left: 1rem; right: 1rem; top: auto; bottom: 1rem; width: auto; max-width: none; }
 }

@@ -11,10 +11,12 @@ const units = mainUnits();
   <article class="paper">
     <header class="paper-header">
       <h1 class="paper-title"><Inline nodes={manifest.title} /></h1>
-      <div class="authors">
-        {manifest.authors.map((a) => <span class="author"><Inline nodes={a.name} /></span>)}
+      <div class="byline">
+        <div class="authors">
+          {manifest.authors.map((a) => <span class="author"><Inline nodes={a.name} /></span>)}
+        </div>
+        {manifest.affiliation && <div class="affiliation"><Inline nodes={manifest.affiliation} /></div>}
       </div>
-      {manifest.affiliation && <div class="affiliation"><Inline nodes={manifest.affiliation} /></div>}
       {manifest.repoUrl && (
         <div class="repo"><a href={manifest.repoUrl} target="_blank" rel="noopener">{manifest.repoUrl}</a></div>
       )}
@@ -22,7 +24,7 @@ const units = mainUnits();
         <h2 class="abstract-label">Abstract</h2>
         <Blocks blocks={manifest.abstract} />
       </div>
-      {manifest.epigraph && <Blocks blocks={[manifest.epigraph]} />}
+      {manifest.epigraph && <div class="epigraph-wrap"><Blocks blocks={[manifest.epigraph]} /></div>}
     </header>
 
     {units.map((u) => (

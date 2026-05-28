@@ -14,6 +14,7 @@ import type {
   ListItem,
   ModelExamplePart,
   TableBlock,
+  TextNode,
 } from "./types.ts";
 import type { Ctx } from "./context.ts";
 import { isEnv, isMacro, mArg, mArgs, oArg, plainText, raw, trimNodes } from "./ast.ts";
@@ -97,12 +98,33 @@ const FLATTEN_MACROS = new Set(["textrm", "textnormal", "textsf", "textup", "tex
 
 // ------------------------------- inlines --------------------------------
 
+/**
+ * Merge adjacent text nodes, then decode punctuation on the merged runs. This
+ * is essential because unified-latex splits "---", "``", "''" into separate
+ * single-character string nodes, so per-node decoding would never see them.
+ */
+function normalizeInlines(arr: Inline[]): Inline[] {
+  const out: Inline[] = [];
+  for (const n of arr) {
+    const last = out[out.length - 1];
+    if (n.type === "text" && last && last.type === "text") {
+      (last as TextNode).value += n.value;
+    } else {
+      out.push(n);
+    }
+  }
+  for (const n of out) {
+    if (n.type === "text") (n as TextNode).value = decodeText((n as TextNode).value);
+  }
+  return out;
+}
+
 export function transformInlines(nodes: Ast.Node[], ctx: Ctx): Inline[] {
   const out: Inline[] = [];
   for (const n of nodes) {
     switch (n.type) {
       case "string":
-        out.push(text(decodeText(n.content)));
+        out.push(text(n.content)); // decoded later in normalizeInlines
         break;
       case "whitespace":
         out.push(text(" "));
@@ -131,7 +153,7 @@ export function transformInlines(nodes: Ast.Node[], ctx: Ctx): Inline[] {
         break;
     }
   }
-  return out;
+  return normalizeInlines(out);
 }
 
 function inl(nodes: Ast.Node[], ctx: Ctx): Inline[] {
@@ -489,8 +511,30 @@ export function transformBlocks(nodes: Ast.Node[], ctx: Ctx): Block[] {
   return blocks;
 }
 
+/** Section titles shouldn't carry citations; strip them + any dangling connector. */
+function cleanHeadingTitle(title: Inline[]): Inline[] {
+  const hadCite = title.some((n) => n.type === "citeRef");
+  const out = title.filter((n) => n.type !== "citeRef");
+  if (hadCite) {
+    while (out.length) {
+      const last = out[out.length - 1];
+      if (last.type !== "text") break;
+      const v = last.value
+        .replace(/[\s,]+$/, "")
+        .replace(/\s+(of|by|from|in|de|and|with)$/i, "")
+        .replace(/[\s,]+$/, "");
+      if (v) {
+        (last as TextNode).value = v;
+        break;
+      }
+      out.pop();
+    }
+  }
+  return out;
+}
+
 function makeHeading(m: Ast.Macro, level: 1 | 2 | 3 | 4, ctx: Ctx): Block {
-  const title = inl(mArg(m), ctx);
+  const title = cleanHeadingTitle(inl(mArg(m), ctx));
   const id = ctx.makeId(slugifyLabel(inlineToPlain(title)) || `sec-${blocksCounter()}`);
   return { type: "heading", level, title, id };
 }

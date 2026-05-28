@@ -16,7 +16,7 @@ const Heading = block.type === "heading" ? (`h${Math.min(block.level + 1, 6)}` a
 ---
 {block.type === "heading" && (
   <Heading id={block.id} class={`heading lvl-${block.level}`}>
-    {block.number && <span class="sec-num">{block.number}</span>}
+    {block.number && <span class="sec-num">§{block.number}</span>}
     <Inline nodes={block.title} footnotes={footnotes} />
     <a class="anchor" href={`#${block.id}`} aria-label="link to this section">¶</a>
   </Heading>

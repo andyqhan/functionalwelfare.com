@@ -13,4 +13,8 @@
 
 import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 
-export const figureOverrides: Record<string, AstroComponentFactory> = {};
+import MazeInteractive from "./figures/MazeInteractive.astro";
+
+export const figureOverrides: Record<string, AstroComponentFactory> = {
+  "fig:maze_context": MazeInteractive,
+};

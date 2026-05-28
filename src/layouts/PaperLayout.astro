@@ -39,6 +39,10 @@ const { title, currentSlug } = Astro.props;
     <main class="content">
       <slot />
     </main>
+    <div class="lightbox" id="lightbox" aria-hidden="true">
+      <button class="lightbox-close" aria-label="Close">×</button>
+      <img alt="" />
+    </div>
     <script is:inline>
       const toggle = document.getElementById("toc-toggle");
       toggle && toggle.addEventListener("click", () => document.body.classList.toggle("toc-open"));
@@ -71,6 +75,20 @@ const { title, currentSlug } = Astro.props;
           root.style.removeProperty("--sidebar-w");
           try { localStorage.removeItem("fw-sidebar-w"); } catch (e) {}
         });
+      }
+
+      // Figure/table lightbox: click a static image to view it full screen.
+      const lb = document.getElementById("lightbox");
+      if (lb) {
+        const lbImg = lb.querySelector("img");
+        const open = (src, alt) => { lbImg.src = src; lbImg.alt = alt || ""; lb.classList.add("open"); lb.setAttribute("aria-hidden", "false"); };
+        const close = () => { lb.classList.remove("open"); lb.setAttribute("aria-hidden", "true"); lbImg.removeAttribute("src"); };
+        document.addEventListener("click", (e) => {
+          const img = e.target.closest(".fig-items img, .tbl-img");
+          if (img) { open(img.currentSrc || img.src, img.alt); }
+        });
+        lb.addEventListener("click", close);
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
       }
     </script>
   </body>

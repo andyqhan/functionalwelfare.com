@@ -1,0 +1,632 @@
+---
+// Interactive replacement for Figure 2 (`fig:maze_context`).
+//
+// Lets the reader play the maze environment the agents were trained in: drive the
+// mousebot with the N/E/S/W buttons, watch the live prompt the model would see, and
+// toggle the three manipulations (wind, melting path, shuffled prompt). The game
+// mechanics are a faithful JS port of ../rl-sentiment-vector/src/maze (maze.py +
+// game.py) and the reward rule in pytorch_trainer/rollout.py; the visual style
+// matches ../valence-neurips/figures/maze_figure_v2.
+//
+// The three tile types use the paper's affectively-neutral names: Path 🧾,
+// Gold 📐 (+20), Mold 📇 (−10). (Internally the ported code calls them
+// path/goal/lava to mirror the source, but nothing user-facing says lava/goal.)
+import type { FigureBlock, Footnote } from "../../../lib/ir";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node } = Astro.props;
+const num = node.number;
+---
+
+<figure id={node.label} class="fig maze-fig">
+  <div class="maze-app">
+    <div class="maze-panels">
+      <!-- Left: the live model prompt + movement controls -->
+      <section class="panel prompt-panel">
+        <div class="panel-head">Prompt <span class="head-sub">— all the model sees</span></div>
+        <div class="prompt-bubble">
+          <div class="wind-msg" hidden></div>
+          <div class="prompt-text"></div>
+        </div>
+        <div class="dpad" role="group" aria-label="Move the mousebot">
+          <button class="db db-n" data-dir="north" aria-label="Move north">N</button>
+          <button class="db db-w" data-dir="west" aria-label="Move west">W</button>
+          <button class="db db-e" data-dir="east" aria-label="Move east">E</button>
+          <button class="db db-s" data-dir="south" aria-label="Move south">S</button>
+        </div>
+      </section>
+
+      <!-- Right: bird's-eye view (the model never sees this) -->
+      <section class="panel maze-panel">
+        <div class="panel-head">Maze overview <span class="head-sub">— hidden from the model</span></div>
+        <div class="maze-grid">
+          <div class="cells"></div>
+          <svg class="trail" viewBox="0 0 11 11" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <img class="mousebot" src="/mousebot.png" alt="" draggable="false" />
+        </div>
+        <div class="legend">
+          <span class="chip"><span class="ebox" data-kind="path">🧾</span> Path</span>
+          <span class="chip"><span class="ebox" data-kind="goal">📐</span> Gold <em>+20</em></span>
+          <span class="chip"><span class="ebox" data-kind="lava">📇</span> Mold <em>−10</em></span>
+        </div>
+      </section>
+    </div>
+
+    <div class="maze-bar">
+      <div class="stat"><span class="stat-k">Turn</span> <b class="turns">0</b><span class="stat-k"> / 5</span></div>
+      <div class="stat reward-stat">
+        <span class="stat-k">Reward</span> <b class="reward">0.0</b>
+        <span class="delta-host"></span>
+      </div>
+      <button class="reset" type="button">New maze ↻</button>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" data-opt="wind" /> Wind</label>
+      <label><input type="checkbox" data-opt="melt" checked /> Melting path</label>
+      <label><input type="checkbox" data-opt="shuffle" /> Shuffled prompt</label>
+    </div>
+  </div>
+
+  <figcaption>
+    {num && <span class="cap-label">Figure {num}.</span>}{" "}
+    The maze environment, playable. Drive the mousebot with <b>N/E/S/W</b>: each step
+    costs <b>−0.1</b>, stepping on <span class="cap-sc">Gold</span> 📐 scores <b>+20</b>
+    (then it vanishes), and <span class="cap-sc">Mold</span> 📇 scores <b>−10</b>. The
+    model sees only the text prompt on the left, never the bird's-eye map. Toggle the
+    three manipulations used in training — <b>wind</b> (a random gust shoves the agent a
+    tile), a <b>melting path</b> (tiles turn to Mold once you leave them, shown as red
+    hatches), and a <b>shuffled prompt</b> (the order the directions are listed in is
+    permuted). Here each episode is 5 moves on an 11×11 grid; in training the agents run
+    15-step trajectories on a 100×100 grid.
+  </figcaption>
+</figure>
+
+<style>
+  .maze-fig > .maze-app { grid-column: 2; grid-row: 1; min-width: 0; }
+  .maze-fig .cap-sc { font-variant: small-caps; }
+
+  .maze-app {
+    --m-path: #e8e8e8;
+    --m-mold: rgb(225, 150, 145);
+    --m-gold: #5b8db8;
+    --m-accent: #6c5ce7;
+    --m-hatch: rgba(225, 150, 145, 0.95);
+    --m-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--m-sans);
+    color: var(--ink);
+  }
+
+  .maze-panels { display: flex; flex-wrap: wrap; gap: 1.1rem; align-items: stretch; }
+  .panel { min-width: 0; display: flex; flex-direction: column; }
+  .prompt-panel { flex: 1 1 14rem; }
+  .maze-panel { flex: 0 1 18rem; }
+
+  .panel-head {
+    font-family: var(--serif);
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.45rem;
+  }
+  .head-sub { font-family: var(--m-sans); font-weight: 400; font-size: 0.74rem; color: var(--muted); }
+
+  /* ---- prompt bubble ---- */
+  .prompt-bubble {
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+    flex: 1;
+  }
+  .wind-msg {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #b8632e;
+    background: #fbf0e6;
+    border: 1px solid #f0d8c2;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+  .prompt-text { font-size: 0.9rem; line-height: 1.7; color: var(--ink); }
+  .prompt-text .loc { font-variant-numeric: tabular-nums; }
+  .prompt-text .clauses { margin-top: 0.35rem; }
+  .prompt-text .ask { margin-top: 0.4rem; color: var(--muted); }
+
+  .ebox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.55em;
+    height: 1.55em;
+    background: #fff;
+    border: 2.5px solid var(--m-path);
+    border-radius: 5px;
+    font-size: 0.9em;
+    line-height: 1;
+    vertical-align: -0.45em;
+    box-sizing: border-box;
+  }
+  .ebox[data-kind="lava"] { border-color: var(--m-mold); }
+  .ebox[data-kind="goal"] { border-color: var(--m-gold); }
+
+  /* ---- D-pad ---- */
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 2.6rem);
+    grid-template-rows: repeat(3, 2.6rem);
+    gap: 0.35rem;
+    justify-content: center;
+    margin-top: 0.9rem;
+  }
+  .db-n { grid-area: 1 / 2; }
+  .db-w { grid-area: 2 / 1; }
+  .db-e { grid-area: 2 / 3; }
+  .db-s { grid-area: 3 / 2; }
+  .db {
+    font-family: var(--m-sans);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--m-accent);
+    background: #fff;
+    border: 1.5px solid var(--rule);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  }
+  .db:hover:not(:disabled) { border-color: var(--m-accent); background: #f3f1fc; }
+  .db:active:not(:disabled) { transform: translateY(1px); }
+  .db:disabled { opacity: 0.32; cursor: default; }
+
+  /* ---- maze grid ---- */
+  .maze-grid {
+    position: relative;
+    width: 100%;
+    max-width: 18rem;
+    aspect-ratio: 1;
+    margin: 0 auto;
+    border-radius: 6px;
+    overflow: hidden;
+    container-type: inline-size;
+    background: #fff;
+  }
+  .cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(11, 1fr); }
+  .cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.8cqw;
+    line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  }
+  .cell[data-kind="path"] { background: var(--m-path); }
+  .cell[data-kind="lava"] { background: var(--m-mold); }
+  .cell[data-kind="goal"] { background: var(--m-gold); }
+  .cell[data-kind="path"] .em { opacity: 0.18; }
+  .cell[data-kind="lava"] .em,
+  .cell[data-kind="goal"] .em { opacity: 0.5; }
+  /* tiles that melted into Mold: red diagonal hatch over the Mold colour */
+  .cell.melted {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--m-hatch) 0,
+      var(--m-hatch) 1.6cqw,
+      transparent 1.6cqw,
+      transparent 3.2cqw
+    );
+  }
+
+  .trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+  .mousebot {
+    position: absolute;
+    width: 9.5cqw;
+    height: 9.5cqw;
+    transform: translate(-50%, -50%);
+    transition: left 0.18s ease, top 0.18s ease;
+    pointer-events: none;
+    z-index: 6;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  }
+
+  /* ---- legend ---- */
+  .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: center; margin-top: 0.6rem; }
+  .chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--ink); }
+  .chip .ebox { width: 1.35em; height: 1.35em; vertical-align: middle; }
+  .chip em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* ---- status bar ---- */
+  .maze-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+    margin-top: 1.1rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--rule);
+  }
+  .stat { font-size: 0.95rem; }
+  .stat-k { color: var(--muted); font-size: 0.82rem; }
+  .stat b { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .reward-stat { position: relative; }
+  .reward-stat .reward { font-size: 1.5rem; }
+  .delta-host { position: relative; display: inline-block; width: 0; }
+  .delta {
+    position: absolute;
+    left: 0.3rem;
+    bottom: 0;
+    font-weight: 700;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: delta-float 0.9s ease-out forwards;
+  }
+  .delta.pos { color: #2f8f4e; }
+  .delta.neg { color: #c0413c; }
+  @keyframes delta-float {
+    0% { opacity: 0; transform: translateY(0.4rem); }
+    25% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-1.1rem); }
+  }
+  .reset {
+    margin-left: auto;
+    font-family: var(--m-sans);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: #fff;
+    border: 1.5px solid var(--rule);
+    border-radius: 7px;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .reset:hover { border-color: var(--m-accent); background: #f3f1fc; }
+
+  /* ---- toggles ---- */
+  .toggles { display: flex; flex-wrap: wrap; gap: 0.4rem 1.3rem; margin-top: 0.8rem; }
+  .toggles label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .toggles input { accent-color: var(--m-accent); cursor: pointer; }
+
+  .maze-app.done .dpad { opacity: 0.55; }
+
+  @media (max-width: 900px) {
+    .maze-fig > .maze-app { grid-column: 1; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var root = document.getElementById("fig:maze_context");
+    if (!root) return;
+
+    // ---- constants (ported from rl-sentiment-vector) ----
+    var N = 11;
+    var MAX_TURNS = 5;
+    var STEP_PENALTY = -0.1,
+      GOAL_REWARD = 20,
+      LAVA_PENALTY = -10;
+    var WIND_PROB = 0.3; // demo-visible; training uses 0.1
+    var GOAL_LAVA_RATIO = 0.18;
+    var DIRS = { north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] };
+    var OPP = { north: "south", south: "north", east: "west", west: "east" };
+    var ORDER = ["north", "east", "south", "west"];
+    var EMOJI = { path: "🧾", lava: "📇", goal: "📐" };
+    var cap = function (s) { return s.charAt(0).toUpperCase() + s.slice(1); };
+    var ri = function (a, b) { return a + Math.floor(Math.random() * (b - a + 1)); };
+
+    // ---- DOM ----
+    var app = root.querySelector(".maze-app");
+    var cellsEl = root.querySelector(".cells");
+    var trailEl = root.querySelector(".trail");
+    var botEl = root.querySelector(".mousebot");
+    var promptEl = root.querySelector(".prompt-text");
+    var windEl = root.querySelector(".wind-msg");
+    var turnsEl = root.querySelector(".turns");
+    var rewardEl = root.querySelector(".reward");
+    var deltaHost = root.querySelector(".delta-host");
+    var buttons = {};
+    root.querySelectorAll(".db").forEach(function (b) { buttons[b.dataset.dir] = b; });
+
+    var opts = { wind: false, melt: true, shuffle: false };
+    var S = null;
+
+    // ---- maze generation (port of MazeGenerator.generate) ----
+    function generateMaze() {
+      var grid = [];
+      for (var y = 0; y < N; y++) {
+        grid.push([]);
+        for (var x = 0; x < N; x++) grid[y].push("lava");
+      }
+      // random walk through the interior to carve path
+      var px = ri(1, N - 2),
+        py = ri(1, N - 2);
+      grid[py][px] = "path";
+      var interior = N - 2;
+      var walk = ri(interior * 5, interior * 15);
+      var steps = [[0, -1], [0, 1], [1, 0], [-1, 0]];
+      for (var i = 0; i < walk; i++) {
+        var valid = steps.filter(function (d) {
+          return px + d[0] >= 1 && px + d[0] < N - 1 && py + d[1] >= 1 && py + d[1] < N - 1;
+        });
+        if (!valid.length) break;
+        var d = valid[Math.floor(Math.random() * valid.length)];
+        px += d[0];
+        py += d[1];
+        grid[py][px] = "path";
+      }
+      // clamp interior lava fraction into [10%, 50%]
+      var lavaCells = [];
+      for (var iy = 1; iy < N - 1; iy++)
+        for (var ix = 1; ix < N - 1; ix++)
+          if (grid[iy][ix] === "lava") lavaCells.push([ix, iy]);
+      var totalInterior = interior * interior;
+      var minLava = Math.floor(totalInterior * 0.1) + 1;
+      var maxLava = Math.floor(totalInterior * 0.5) - 1;
+      if (lavaCells.length > maxLava) {
+        var convert = lavaCells.length - ri(minLava, maxLava);
+        shuffle(lavaCells);
+        for (var c = 0; c < Math.min(convert, lavaCells.length); c++) {
+          grid[lavaCells[c][1]][lavaCells[c][0]] = "path";
+        }
+      }
+      // place goals on a fraction of path tiles, scaled to remaining lava
+      var lavaCount = 0,
+        pathTiles = [];
+      for (var jy = 1; jy < N - 1; jy++)
+        for (var jx = 1; jx < N - 1; jx++) {
+          if (grid[jy][jx] === "lava") lavaCount++;
+          else if (grid[jy][jx] === "path") pathTiles.push([jx, jy]);
+        }
+      var numGoals = Math.max(1, Math.round(lavaCount * GOAL_LAVA_RATIO));
+      shuffle(pathTiles);
+      for (var g = 0; g < Math.min(numGoals, pathTiles.length); g++) {
+        grid[pathTiles[g][1]][pathTiles[g][0]] = "goal";
+      }
+      return { grid: grid, start: findCenterStart(grid) };
+    }
+
+    function shuffle(a) {
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+      return a;
+    }
+
+    // BFS from centre to the nearest Path tile (port of _find_center_start)
+    function findCenterStart(grid) {
+      var c = Math.floor(N / 2);
+      var queue = [[c, c]];
+      var seen = {};
+      seen[c + "," + c] = 1;
+      var nb = [[0, -1], [0, 1], [1, 0], [-1, 0]];
+      while (queue.length) {
+        var p = queue.shift();
+        if (grid[p[1]][p[0]] === "path") return [p[0], p[1]];
+        for (var k = 0; k < 4; k++) {
+          var nx = p[0] + nb[k][0],
+            ny = p[1] + nb[k][1],
+            key = nx + "," + ny;
+          if (!seen[key] && nx >= 0 && nx < N && ny >= 0 && ny < N) {
+            seen[key] = 1;
+            queue.push([nx, ny]);
+          }
+        }
+      }
+      return [c, c];
+    }
+
+    // ---- game helpers ----
+    function inBounds(x, y) { return x >= 0 && x < N && y >= 0 && y < N; }
+
+    function getTile(x, y) {
+      var key = x + "," + y;
+      if (S.melted[key]) return "lava";
+      var t = S.grid[y][x];
+      if (t === "goal" && S.consumed[key]) return "path";
+      return t;
+    }
+
+    function reset() {
+      var m = generateMaze();
+      S = {
+        grid: m.grid,
+        pos: [m.start[0], m.start[1]],
+        melted: {},
+        consumed: {},
+        steps: 0,
+        reward: 0,
+        order: opts.shuffle ? shuffle(ORDER.slice()) : ORDER.slice(),
+        windMsg: null,
+        done: false,
+        trail: [[m.start[0], m.start[1]]],
+      };
+      app.classList.remove("done");
+      deltaHost.innerHTML = "";
+      render();
+    }
+
+    function tileDelta(x, y) {
+      var key = x + "," + y,
+        t = getTile(x, y),
+        d = 0;
+      if (t === "lava") d += LAVA_PENALTY;
+      else if (t === "goal") {
+        d += GOAL_REWARD;
+        S.consumed[key] = 1;
+      }
+      return d;
+    }
+
+    function applyWind() {
+      if (!opts.wind || Math.random() >= WIND_PROB) return 0;
+      var from = ORDER[Math.floor(Math.random() * 4)];
+      var push = OPP[from];
+      var d = DIRS[push];
+      var nx = S.pos[0] + d[0],
+        ny = S.pos[1] + d[1];
+      if (!inBounds(nx, ny)) return 0; // blocked by the wall: no effect
+      if (opts.melt && getTile(S.pos[0], S.pos[1]) === "path")
+        S.melted[S.pos[0] + "," + S.pos[1]] = 1;
+      S.pos = [nx, ny];
+      S.trail.push([nx, ny]);
+      S.windMsg = "A strong wind from the " + cap(from) + " blew you " + cap(push) + "!";
+      return tileDelta(nx, ny);
+    }
+
+    function move(dir) {
+      if (S.done) return;
+      var d = DIRS[dir];
+      var nx = S.pos[0] + d[0],
+        ny = S.pos[1] + d[1];
+      if (!inBounds(nx, ny)) return;
+      S.windMsg = null;
+      // melt the tile we step off (if it is Path)
+      if (opts.melt && getTile(S.pos[0], S.pos[1]) === "path")
+        S.melted[S.pos[0] + "," + S.pos[1]] = 1;
+      S.pos = [nx, ny];
+      S.steps++;
+      var delta = STEP_PENALTY + tileDelta(nx, ny);
+      S.trail.push([nx, ny]);
+      delta += applyWind(); // wind adds no extra step penalty, just its tile effect
+      S.reward += delta;
+      if (S.steps >= MAX_TURNS) {
+        S.done = true;
+        app.classList.add("done");
+      }
+      render();
+      flashDelta(delta);
+    }
+
+    // ---- rendering ----
+    function render() {
+      // cells
+      var html = "";
+      for (var y = 0; y < N; y++) {
+        for (var x = 0; x < N; x++) {
+          var kind = getTile(x, y);
+          var melted = S.melted[x + "," + y] ? " melted" : "";
+          html +=
+            '<div class="cell' + melted + '" data-kind="' + kind + '">' +
+            '<span class="em">' + EMOJI[kind] + "</span></div>";
+        }
+      }
+      cellsEl.innerHTML = html;
+
+      // trail (coords in grid units thanks to viewBox 0 0 11 11)
+      var pts = S.trail.map(function (p) { return (p[0] + 0.5) + " " + (p[1] + 0.5); });
+      var svg = "";
+      if (pts.length > 1) {
+        var dAttr = "M " + pts.join(" L ");
+        svg =
+          '<path d="' + dAttr + '" fill="none" stroke="#fff" stroke-width="0.26" ' +
+          'stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>' +
+          '<path d="' + dAttr + '" fill="none" stroke="#7c3aed" stroke-width="0.11" ' +
+          'stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.2 0.15"/>';
+      }
+      trailEl.innerHTML = svg;
+
+      // mousebot
+      botEl.style.left = ((S.pos[0] + 0.5) / N) * 100 + "%";
+      botEl.style.top = ((S.pos[1] + 0.5) / N) * 100 + "%";
+
+      // prompt
+      renderPrompt();
+
+      // buttons
+      for (var dir in DIRS) {
+        var dd = DIRS[dir];
+        var ok = !S.done && inBounds(S.pos[0] + dd[0], S.pos[1] + dd[1]);
+        buttons[dir].disabled = !ok;
+      }
+
+      // status
+      turnsEl.textContent = String(S.steps);
+      rewardEl.textContent = S.reward.toFixed(1);
+    }
+
+    function ebox(kind) {
+      return '<span class="ebox" data-kind="' + kind + '">' + EMOJI[kind] + "</span>";
+    }
+
+    function renderPrompt() {
+      if (S.windMsg) {
+        windEl.textContent = S.windMsg;
+        windEl.hidden = false;
+      } else {
+        windEl.hidden = true;
+      }
+      var clauses = [];
+      for (var i = 0; i < S.order.length; i++) {
+        var dir = S.order[i];
+        var dd = DIRS[dir];
+        var nx = S.pos[0] + dd[0],
+          ny = S.pos[1] + dd[1];
+        if (!inBounds(nx, ny)) continue; // only in-bounds directions are shown
+        clauses.push("to the " + dir + " there is " + ebox(getTile(nx, ny)));
+      }
+      var clauseText = "";
+      if (clauses.length) {
+        clauses[0] = clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1);
+        clauseText = clauses.join("; ") + ".";
+      }
+      promptEl.innerHTML =
+        '<div class="loc">You are in a maze. Currently, you’re at location (' +
+        S.pos[0] + ", " + S.pos[1] + ").</div>" +
+        '<div class="clauses">' + clauseText + "</div>" +
+        '<div class="ask">Where do you move? Output only N/E/S/W without punctuation.</div>';
+    }
+
+    function flashDelta(delta) {
+      if (!delta) return;
+      var rounded = Math.round(delta * 10) / 10;
+      var span = document.createElement("span");
+      span.className = "delta " + (rounded >= 0 ? "pos" : "neg");
+      span.textContent = (rounded >= 0 ? "+" : "") + rounded.toFixed(1);
+      deltaHost.appendChild(span);
+      setTimeout(function () { span.remove(); }, 950);
+    }
+
+    // ---- wiring ----
+    root.querySelectorAll(".db").forEach(function (b) {
+      b.addEventListener("click", function () { move(b.dataset.dir); });
+    });
+    root.querySelector(".reset").addEventListener("click", reset);
+    root.querySelectorAll(".toggles input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        opts[inp.dataset.opt] = inp.checked;
+        if (inp.dataset.opt === "shuffle")
+          S.order = opts.shuffle ? shuffle(ORDER.slice()) : ORDER.slice();
+        render();
+      });
+    });
+
+    var KEYMAP = {
+      ArrowUp: "north", ArrowRight: "east", ArrowDown: "south", ArrowLeft: "west",
+      n: "north", e: "east", s: "south", w: "west",
+    };
+    root.addEventListener("keydown", function (ev) {
+      var dir = KEYMAP[ev.key] || KEYMAP[ev.key.toLowerCase()];
+      if (dir) { ev.preventDefault(); move(dir); }
+    });
+    root.tabIndex = 0;
+
+    reset();
+  })();
+</script>

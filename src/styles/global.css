@@ -9,14 +9,14 @@
   --note-margin: 7rem;       /* right margin for footnote sidenotes */
   --cap-margin: 11rem;       /* caption gutter; enhanced layout widens to 13rem */
   --gap: 1.4rem;
-  --sidebar-w: 12rem;        /* user-resizable (see PaperLayout) */
+  --sidebar-w: 24rem;        /* user-resizable (see PaperLayout) */
   /* Title block extends past the paper toward the window edges. Derived from
      available space so it tracks the (resizable) sidebar and never collides. */
   --hdr-breakout: clamp(0rem, calc(50vw - var(--sidebar-w) / 2 - 38rem), 12rem);
 
   --ink: #272622;
   --muted: #6f7178;
-  --bg: #fcfbf8;
+  --bg: #ffffff;
   --paper: #ffffff;
   --accent: #4f7fab;
   --accent-deep: #36608e;
@@ -60,7 +60,7 @@ body {
   overflow-y: auto;
   padding: 2.2rem 1rem 3rem 1.5rem;
   border-right: 1px solid var(--rule);
-  background: #faf9f5;
+  background: var(--bg);
 }
 .content {
   margin-left: var(--sidebar-w);

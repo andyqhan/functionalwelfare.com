@@ -26,7 +26,7 @@ const num = node.number;
     <div class="maze-panels">
       <!-- Left: the live model prompt + movement controls -->
       <section class="panel prompt-panel">
-        <div class="panel-head">Prompt <span class="head-sub">— all the model sees</span></div>
+        <div class="panel-head">Prompt</div>
         <div class="prompt-bubble">
           <div class="wind-msg" hidden></div>
           <div class="prompt-text"></div>
@@ -34,6 +34,7 @@ const num = node.number;
         <div class="dpad" role="group" aria-label="Move the mousebot">
           <button class="db db-n" data-dir="north" aria-label="Move north">N</button>
           <button class="db db-w" data-dir="west" aria-label="Move west">W</button>
+          <img class="dpad-bot" src="/mousebot.png" alt="" draggable="false" />
           <button class="db db-e" data-dir="east" aria-label="Move east">E</button>
           <button class="db db-s" data-dir="south" aria-label="Move south">S</button>
         </div>
@@ -41,16 +42,16 @@ const num = node.number;
 
       <!-- Right: bird's-eye view (the model never sees this) -->
       <section class="panel maze-panel">
-        <div class="panel-head">Maze overview <span class="head-sub">— hidden from the model</span></div>
+        <div class="panel-head">Maze overview</div>
         <div class="maze-grid">
           <div class="cells"></div>
           <svg class="trail" viewBox="0 0 11 11" preserveAspectRatio="none" aria-hidden="true"></svg>
           <img class="mousebot" src="/mousebot.png" alt="" draggable="false" />
         </div>
         <div class="legend">
-          <span class="chip"><span class="ebox" data-kind="path">🧾</span> Path</span>
-          <span class="chip"><span class="ebox" data-kind="goal">📐</span> Gold <em>+20</em></span>
-          <span class="chip"><span class="ebox" data-kind="lava">📇</span> Mold <em>−10</em></span>
+          <span class="chip">🧾 Path</span>
+          <span class="chip">📐 Gold <em>+20</em></span>
+          <span class="chip">📇 Mold <em>−10</em></span>
         </div>
       </section>
     </div>
@@ -66,6 +67,10 @@ const num = node.number;
 
     <div class="toggles">
       <label><input type="checkbox" data-opt="wind" /> Wind</label>
+      <span class="wind-freq" hidden>
+        <input type="range" class="wind-range" min="0" max="100" step="5" value="10" aria-label="Wind frequency" />
+        <span class="wind-pct">10%</span>
+      </span>
       <label><input type="checkbox" data-opt="melt" checked /> Melting path</label>
       <label><input type="checkbox" data-opt="shuffle" /> Shuffled prompt</label>
     </div>
@@ -73,15 +78,13 @@ const num = node.number;
 
   <figcaption>
     {num && <span class="cap-label">Figure {num}.</span>}{" "}
-    The maze environment, playable. Drive the mousebot with <b>N/E/S/W</b>: each step
+    Interactive maze environment. You can drive the agent with <b>N/E/S/W</b>: each step
     costs <b>−0.1</b>, stepping on <span class="cap-sc">Gold</span> 📐 scores <b>+20</b>
-    (then it vanishes), and <span class="cap-sc">Mold</span> 📇 scores <b>−10</b>. The
-    model sees only the text prompt on the left, never the bird's-eye map. Toggle the
-    three manipulations used in training — <b>wind</b> (a random gust shoves the agent a
-    tile), a <b>melting path</b> (tiles turn to Mold once you leave them, shown as red
-    hatches), and a <b>shuffled prompt</b> (the order the directions are listed in is
-    permuted). Here each episode is 5 moves on an 11×11 grid; in training the agents run
-    15-step trajectories on a 100×100 grid.
+    (then it turns into Mold), and <span class="cap-sc">Mold</span> 📇 scores <b>−10</b>. The
+    model only ever sees the text prompt on the left, never the bird's-eye view on the right. You can toggle the
+    three additional maze features used in training: <b>wind</b> (a random gust frustrates the best laid plans of mice and Qwen), a <b>melting path</b> (tiles turn to Mold once you leave them), and a <b>shuffled prompt</b> (the order the directions are listed in is
+    randomized, once per training episode). Here each episode is 5 moves on an 11×11 grid. In training the agents do 
+    15-step trajectories on a 100×100 grid, and thus can never reach the edge.
   </figcaption>
 </figure>
 
@@ -100,9 +103,9 @@ const num = node.number;
     color: var(--ink);
   }
 
-  .maze-panels { display: flex; flex-wrap: wrap; gap: 1.1rem; align-items: stretch; }
+  .maze-panels { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: stretch; justify-content: center; }
   .panel { min-width: 0; display: flex; flex-direction: column; }
-  .prompt-panel { flex: 1 1 14rem; }
+  .prompt-panel { flex: 1 1 16rem; }
   .maze-panel { flex: 0 1 18rem; }
 
   .panel-head {
@@ -112,7 +115,6 @@ const num = node.number;
     color: var(--ink);
     margin-bottom: 0.45rem;
   }
-  .head-sub { font-family: var(--m-sans); font-weight: 400; font-size: 0.74rem; color: var(--muted); }
 
   /* ---- prompt bubble ---- */
   .prompt-bubble {
@@ -134,40 +136,33 @@ const num = node.number;
     margin-bottom: 0.6rem;
   }
   .prompt-text { font-size: 0.9rem; line-height: 1.7; color: var(--ink); }
-  .prompt-text .loc { font-variant-numeric: tabular-nums; }
-  .prompt-text .clauses { margin-top: 0.35rem; }
-  .prompt-text .ask { margin-top: 0.4rem; color: var(--muted); }
-
-  .ebox {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.55em;
-    height: 1.55em;
-    background: #fff;
-    border: 2.5px solid var(--m-path);
-    border-radius: 5px;
-    font-size: 0.9em;
-    line-height: 1;
-    vertical-align: -0.45em;
-    box-sizing: border-box;
-  }
-  .ebox[data-kind="lava"] { border-color: var(--m-mold); }
-  .ebox[data-kind="goal"] { border-color: var(--m-gold); }
+  /* NOTE: styles for elements built at runtime by JS (.cell, .em, .delta) live
+     in the <style is:global> block below — Astro's scoped attribute is only
+     added to template elements. */
 
   /* ---- D-pad ---- */
   .dpad {
     display: grid;
-    grid-template-columns: repeat(3, 2.6rem);
-    grid-template-rows: repeat(3, 2.6rem);
+    grid-template-columns: repeat(3, 2.5rem);
+    grid-template-rows: repeat(3, 2.5rem);
     gap: 0.35rem;
     justify-content: center;
-    margin-top: 0.9rem;
+    margin-top: 1rem;
   }
   .db-n { grid-area: 1 / 2; }
   .db-w { grid-area: 2 / 1; }
   .db-e { grid-area: 2 / 3; }
   .db-s { grid-area: 3 / 2; }
+  .dpad-bot {
+    grid-area: 2 / 2;
+    align-self: center;
+    justify-self: center;
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  }
   .db {
     font-family: var(--m-sans);
     font-size: 1rem;
@@ -184,43 +179,20 @@ const num = node.number;
   .db:disabled { opacity: 0.32; cursor: default; }
 
   /* ---- maze grid ---- */
+  /* The cells grid lives in normal flow and defines the (square) height, so the
+     absolutely-overlaid trail + mousebot positioned by % cannot drift out of
+     alignment with the tiles. */
   .maze-grid {
     position: relative;
     width: 100%;
     max-width: 18rem;
-    aspect-ratio: 1;
     margin: 0 auto;
     border-radius: 6px;
     overflow: hidden;
     container-type: inline-size;
     background: #fff;
   }
-  .cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(11, 1fr); }
-  .cell {
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3.8cqw;
-    line-height: 1;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-  }
-  .cell[data-kind="path"] { background: var(--m-path); }
-  .cell[data-kind="lava"] { background: var(--m-mold); }
-  .cell[data-kind="goal"] { background: var(--m-gold); }
-  .cell[data-kind="path"] .em { opacity: 0.18; }
-  .cell[data-kind="lava"] .em,
-  .cell[data-kind="goal"] .em { opacity: 0.5; }
-  /* tiles that melted into Mold: red diagonal hatch over the Mold colour */
-  .cell.melted {
-    background-image: repeating-linear-gradient(
-      45deg,
-      var(--m-hatch) 0,
-      var(--m-hatch) 1.6cqw,
-      transparent 1.6cqw,
-      transparent 3.2cqw
-    );
-  }
+  .cells { display: grid; grid-template-columns: repeat(11, 1fr); }
 
   .trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
   .mousebot {
@@ -236,8 +208,7 @@ const num = node.number;
 
   /* ---- legend ---- */
   .legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: center; margin-top: 0.6rem; }
-  .chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--ink); }
-  .chip .ebox { width: 1.35em; height: 1.35em; vertical-align: middle; }
+  .chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--ink); }
   .chip em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* ---- status bar ---- */
@@ -256,24 +227,6 @@ const num = node.number;
   .reward-stat { position: relative; }
   .reward-stat .reward { font-size: 1.5rem; }
   .delta-host { position: relative; display: inline-block; width: 0; }
-  .delta {
-    position: absolute;
-    left: 0.3rem;
-    bottom: 0;
-    font-weight: 700;
-    font-size: 0.9rem;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    pointer-events: none;
-    animation: delta-float 0.9s ease-out forwards;
-  }
-  .delta.pos { color: #2f8f4e; }
-  .delta.neg { color: #c0413c; }
-  @keyframes delta-float {
-    0% { opacity: 0; transform: translateY(0.4rem); }
-    25% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-1.1rem); }
-  }
   .reset {
     margin-left: auto;
     font-family: var(--m-sans);
@@ -300,11 +253,70 @@ const num = node.number;
     cursor: pointer;
   }
   .toggles input { accent-color: var(--m-accent); cursor: pointer; }
+  .wind-freq { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--muted); }
+  .wind-freq[hidden] { display: none; }
+  .wind-range { width: 6rem; accent-color: var(--m-accent); cursor: pointer; }
+  .wind-pct { font-variant-numeric: tabular-nums; min-width: 2.6em; }
 
   .maze-app.done .dpad { opacity: 0.55; }
 
   @media (max-width: 900px) {
     .maze-fig > .maze-app { grid-column: 1; }
+  }
+</style>
+
+<!-- Styles for elements created at runtime by the script. Astro only adds its
+     scoping attribute to template elements, so these must be global; they are
+     namespaced under .maze-fig (a static element) to avoid leaking site-wide.
+     CSS custom properties (--m-*) and the cqw container still resolve via the
+     scoped ancestors through normal inheritance. -->
+<style is:global>
+  /* maze tiles */
+  .maze-fig .cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.8cqw;
+    line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  }
+  .maze-fig .cell[data-kind="path"] { background: var(--m-path); }
+  .maze-fig .cell[data-kind="lava"] { background: var(--m-mold); }
+  .maze-fig .cell[data-kind="goal"] { background: var(--m-gold); }
+  .maze-fig .cell[data-kind="path"] .em { opacity: 0.18; }
+  .maze-fig .cell[data-kind="lava"] .em,
+  .maze-fig .cell[data-kind="goal"] .em { opacity: 0.5; }
+  /* tiles that melted into Mold: red diagonal hatch over the Mold colour */
+  .maze-fig .cell.melted {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--m-hatch) 0,
+      var(--m-hatch) 1.6cqw,
+      transparent 1.6cqw,
+      transparent 3.2cqw
+    );
+  }
+
+  /* reward delta flash */
+  .maze-fig .delta {
+    position: absolute;
+    left: 0.3rem;
+    bottom: 0;
+    width: max-content;
+    font-weight: 700;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: maze-delta-float 0.9s ease-out forwards;
+  }
+  .maze-fig .delta.pos { color: #2f8f4e; }
+  .maze-fig .delta.neg { color: #c0413c; }
+  @keyframes maze-delta-float {
+    0% { opacity: 0; transform: translateY(0.4rem); }
+    25% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-1.1rem); }
   }
 </style>
 
@@ -319,8 +331,8 @@ const num = node.number;
     var STEP_PENALTY = -0.1,
       GOAL_REWARD = 20,
       LAVA_PENALTY = -10;
-    var WIND_PROB = 0.3; // demo-visible; training uses 0.1
-    var GOAL_LAVA_RATIO = 0.18;
+    var windProb = 0.1; // matches the training default; user-configurable while wind is on
+    var GOAL_LAVA_RATIO = 0.36; // doubled for a denser, more rewarding small maze
     var DIRS = { north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] };
     var OPP = { north: "south", south: "north", east: "west", west: "east" };
     var ORDER = ["north", "east", "south", "west"];
@@ -338,6 +350,9 @@ const num = node.number;
     var turnsEl = root.querySelector(".turns");
     var rewardEl = root.querySelector(".reward");
     var deltaHost = root.querySelector(".delta-host");
+    var windFreqEl = root.querySelector(".wind-freq");
+    var windRangeEl = root.querySelector(".wind-range");
+    var windPctEl = root.querySelector(".wind-pct");
     var buttons = {};
     root.querySelectorAll(".db").forEach(function (b) { buttons[b.dataset.dir] = b; });
 
@@ -351,9 +366,10 @@ const num = node.number;
         grid.push([]);
         for (var x = 0; x < N; x++) grid[y].push("lava");
       }
-      // random walk through the interior to carve path
-      var px = ri(1, N - 2),
-        py = ri(1, N - 2);
+      // random walk that always begins at the centre, so the player can start there
+      var CENTER = (N - 1) / 2; // (5, 5) on an 11×11 grid
+      var px = CENTER,
+        py = CENTER;
       grid[py][px] = "path";
       var interior = N - 2;
       var walk = ri(interior * 5, interior * 15);
@@ -396,7 +412,9 @@ const num = node.number;
       for (var g = 0; g < Math.min(numGoals, pathTiles.length); g++) {
         grid[pathTiles[g][1]][pathTiles[g][0]] = "goal";
       }
-      return { grid: grid, start: findCenterStart(grid) };
+      // guarantee the centre is a Path tile so the player always starts on (5, 5)
+      grid[CENTER][CENTER] = "path";
+      return { grid: grid, start: [CENTER, CENTER] };
     }
 
     function shuffle(a) {
@@ -407,29 +425,6 @@ const num = node.number;
         a[j] = t;
       }
       return a;
-    }
-
-    // BFS from centre to the nearest Path tile (port of _find_center_start)
-    function findCenterStart(grid) {
-      var c = Math.floor(N / 2);
-      var queue = [[c, c]];
-      var seen = {};
-      seen[c + "," + c] = 1;
-      var nb = [[0, -1], [0, 1], [1, 0], [-1, 0]];
-      while (queue.length) {
-        var p = queue.shift();
-        if (grid[p[1]][p[0]] === "path") return [p[0], p[1]];
-        for (var k = 0; k < 4; k++) {
-          var nx = p[0] + nb[k][0],
-            ny = p[1] + nb[k][1],
-            key = nx + "," + ny;
-          if (!seen[key] && nx >= 0 && nx < N && ny >= 0 && ny < N) {
-            seen[key] = 1;
-            queue.push([nx, ny]);
-          }
-        }
-      }
-      return [c, c];
     }
 
     // ---- game helpers ----
@@ -475,7 +470,7 @@ const num = node.number;
     }
 
     function applyWind() {
-      if (!opts.wind || Math.random() >= WIND_PROB) return 0;
+      if (!opts.wind || Math.random() >= windProb) return 0;
       var from = ORDER[Math.floor(Math.random() * 4)];
       var push = OPP[from];
       var d = DIRS[push];
@@ -522,9 +517,10 @@ const num = node.number;
         for (var x = 0; x < N; x++) {
           var kind = getTile(x, y);
           var melted = S.melted[x + "," + y] ? " melted" : "";
-          html +=
-            '<div class="cell' + melted + '" data-kind="' + kind + '">' +
-            '<span class="em">' + EMOJI[kind] + "</span></div>";
+          // the mousebot stands on its own cell, so suppress that tile's emoji
+          var isPlayer = x === S.pos[0] && y === S.pos[1];
+          var em = isPlayer ? "" : '<span class="em">' + EMOJI[kind] + "</span>";
+          html += '<div class="cell' + melted + '" data-kind="' + kind + '">' + em + "</div>";
         }
       }
       cellsEl.innerHTML = html;
@@ -561,10 +557,9 @@ const num = node.number;
       rewardEl.textContent = S.reward.toFixed(1);
     }
 
-    function ebox(kind) {
-      return '<span class="ebox" data-kind="' + kind + '">' + EMOJI[kind] + "</span>";
-    }
-
+    // Render the prompt exactly as the model receives it: one continuous string,
+    // plain emoji, no decorative styling. Only in-bounds directions are listed
+    // (matches get_available_directions).
     function renderPrompt() {
       if (S.windMsg) {
         windEl.textContent = S.windMsg;
@@ -578,19 +573,18 @@ const num = node.number;
         var dd = DIRS[dir];
         var nx = S.pos[0] + dd[0],
           ny = S.pos[1] + dd[1];
-        if (!inBounds(nx, ny)) continue; // only in-bounds directions are shown
-        clauses.push("to the " + dir + " there is " + ebox(getTile(nx, ny)));
+        if (!inBounds(nx, ny)) continue;
+        clauses.push("to the " + dir + " there is " + EMOJI[getTile(nx, ny)]);
       }
       var clauseText = "";
       if (clauses.length) {
         clauses[0] = clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1);
-        clauseText = clauses.join("; ") + ".";
+        clauseText = clauses.join("; ") + ". ";
       }
-      promptEl.innerHTML =
-        '<div class="loc">You are in a maze. Currently, you’re at location (' +
-        S.pos[0] + ", " + S.pos[1] + ").</div>" +
-        '<div class="clauses">' + clauseText + "</div>" +
-        '<div class="ask">Where do you move? Output only N/E/S/W without punctuation.</div>';
+      promptEl.textContent =
+        "You are in a maze. Currently, you're at location (" +
+        S.pos[0] + ", " + S.pos[1] + "). " + clauseText +
+        "Where do you move? Output only N/E/S/W without punctuation.";
     }
 
     function flashDelta(delta) {
@@ -608,13 +602,18 @@ const num = node.number;
       b.addEventListener("click", function () { move(b.dataset.dir); });
     });
     root.querySelector(".reset").addEventListener("click", reset);
-    root.querySelectorAll(".toggles input").forEach(function (inp) {
+    root.querySelectorAll('.toggles input[type="checkbox"]').forEach(function (inp) {
       inp.addEventListener("change", function () {
         opts[inp.dataset.opt] = inp.checked;
+        if (inp.dataset.opt === "wind") windFreqEl.hidden = !inp.checked;
         if (inp.dataset.opt === "shuffle")
           S.order = opts.shuffle ? shuffle(ORDER.slice()) : ORDER.slice();
         render();
       });
+    });
+    windRangeEl.addEventListener("input", function () {
+      windProb = +windRangeEl.value / 100;
+      windPctEl.textContent = windRangeEl.value + "%";
     });
 
     var KEYMAP = {

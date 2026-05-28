@@ -50,7 +50,7 @@ const { title, currentSlug } = Astro.props;
       const rez = document.querySelector(".sidebar-resizer");
       if (rez) {
         const root = document.documentElement;
-        const clamp = (x) => Math.max(190, Math.min(440, x));
+        const clamp = (x) => Math.max(190, Math.min(560, x));
         let dragging = false;
         rez.addEventListener("pointerdown", (e) => {
           dragging = true;

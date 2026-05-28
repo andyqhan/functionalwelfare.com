@@ -1,0 +1,19 @@
+---
+import Inline from "./Inline.astro";
+import type { ModelExample, Footnote } from "../../lib/ir";
+
+interface Props {
+  node: ModelExample;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const labels: Record<string, string> = { prompt: "Prompt:", response: "Response:" };
+---
+<div class="model-example">
+  {node.parts.map((part) => (
+    <div class={`ex-${part.kind}`}>
+      {labels[part.kind] && <span class="ex-label">{labels[part.kind]}</span>}{" "}
+      <Inline nodes={part.content} footnotes={footnotes} />
+    </div>
+  ))}
+</div>

@@ -1,0 +1,57 @@
+---
+import Inline from "./Inline.astro";
+import { renderMath } from "../../lib/katex";
+import { labelHref } from "../../lib/ir";
+import type { Inline as InlineT, Footnote } from "../../lib/ir";
+
+interface Props {
+  node: InlineT;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const fnById = new Map(footnotes.map((f) => [f.id, f]));
+
+function footnoteInline(f: Footnote): InlineT[] {
+  const out: InlineT[] = [];
+  for (const b of f.content) {
+    if (b.type === "paragraph") out.push(...b.content, { type: "text", value: " " });
+  }
+  return out;
+}
+const fn = node.type === "footnoteRef" ? fnById.get(node.id) : undefined;
+---
+{node.type === "text" && <Fragment>{node.value}</Fragment>}
+{node.type === "emph" && <em><Inline nodes={node.content} footnotes={footnotes} /></em>}
+{node.type === "strong" && <strong><Inline nodes={node.content} footnotes={footnotes} /></strong>}
+{node.type === "smallcaps" && <span class="sc"><Inline nodes={node.content} footnotes={footnotes} /></span>}
+{node.type === "underline" && <span class="ul"><Inline nodes={node.content} footnotes={footnotes} /></span>}
+{node.type === "code" && <code>{node.value}</code>}
+{node.type === "token" && <span class="tok">{node.value}</span>}
+{node.type === "sup" && <sup><Inline nodes={node.content} footnotes={footnotes} /></sup>}
+{node.type === "sub" && <sub><Inline nodes={node.content} footnotes={footnotes} /></sub>}
+{node.type === "break" && <br />}
+{node.type === "mathInline" && <Fragment set:html={renderMath(node.tex, false)} />}
+{node.type === "emoji" && <img class="emoji" src={node.src} alt={node.name} loading="lazy" />}
+{node.type === "inlineImage" && (
+  <img class="inline-img" src={node.src} alt={node.alt ?? ""} style={node.heightEm ? `height:${node.heightEm}em` : undefined} loading="lazy" />
+)}
+{node.type === "highlight" && <span class={`hl hl-${node.color}`}><Inline nodes={node.content} footnotes={footnotes} /></span>}
+{node.type === "coloredLabel" && (
+  <span style={`color:${node.color}${node.bold ? ";font-weight:700" : ""}`}><Inline nodes={node.content} footnotes={footnotes} /></span>
+)}
+{node.type === "link" && (
+  <a href={node.href} class={node.mono ? "ext mono" : "ext"} target="_blank" rel="noopener"><Inline nodes={node.content} footnotes={footnotes} /></a>
+)}
+{node.type === "crossRef" && <a class="xref" href={labelHref(node.target)}>{node.text}</a>}
+{node.type === "citeRef" && <a class="cite" href={`/#ref-${node.keys[0]}`}>{node.text}</a>}
+{node.type === "footnoteRef" && (
+  <span class="fn">
+    <sup class="fn-mark">{node.id}</sup>
+    {fn && (
+      <span class="sidenote">
+        <sup class="fn-mark">{node.id}</sup>
+        <Inline nodes={footnoteInline(fn)} footnotes={footnotes} />
+      </span>
+    )}
+  </span>
+)}

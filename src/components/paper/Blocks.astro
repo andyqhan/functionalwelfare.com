@@ -1,0 +1,11 @@
+---
+import BlockNode from "./BlockNode.astro";
+import type { Block, Footnote } from "../../lib/ir";
+
+interface Props {
+  blocks: Block[];
+  footnotes?: Footnote[];
+}
+const { blocks, footnotes = [] } = Astro.props;
+---
+{blocks.map((block) => <BlockNode block={block} footnotes={footnotes} />)}

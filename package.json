@@ -1,0 +1,28 @@
+{
+  "name": "functionalwelfare.com",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convert": "tsx scripts/convert/index.ts",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@unified-latex/unified-latex-types": "^1.8.4",
+    "@unified-latex/unified-latex-util-parse": "^1.8.4",
+    "@unified-latex/unified-latex-util-print-raw": "^1.8.4",
+    "@unified-latex/unified-latex-util-to-string": "^1.8.4",
+    "@unified-latex/unified-latex-util-visit": "^1.8.4",
+    "astro": "^6.3.8",
+    "katex": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.8",
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

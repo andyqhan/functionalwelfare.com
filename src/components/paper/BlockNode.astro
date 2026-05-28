@@ -1,0 +1,55 @@
+---
+import Inline from "./Inline.astro";
+import Blocks from "./Blocks.astro";
+import Figure from "./Figure.astro";
+import Table from "./Table.astro";
+import ModelExample from "./ModelExample.astro";
+import { renderMath } from "../../lib/katex";
+import type { Block, Footnote } from "../../lib/ir";
+
+interface Props {
+  block: Block;
+  footnotes?: Footnote[];
+}
+const { block, footnotes = [] } = Astro.props;
+const Heading = block.type === "heading" ? (`h${Math.min(block.level + 1, 6)}` as any) : "h2";
+---
+{block.type === "heading" && (
+  <Heading id={block.id} class={`heading lvl-${block.level}`}>
+    {block.number && <span class="sec-num">{block.number}</span>}
+    <Inline nodes={block.title} footnotes={footnotes} />
+    <a class="anchor" href={`#${block.id}`} aria-label="link to this section">¶</a>
+  </Heading>
+)}
+
+{block.type === "paragraph" && <p><Inline nodes={block.content} footnotes={footnotes} /></p>}
+
+{block.type === "mathBlock" && (
+  <div class="math-display" id={block.id}>
+    <Fragment set:html={renderMath(block.tex, true)} />
+    {block.number && <span class="eq-num">({block.number})</span>}
+  </div>
+)}
+
+{block.type === "list" && block.ordered && (
+  <ol>{block.items.map((it) => <li><Blocks blocks={it.content} footnotes={footnotes} /></li>)}</ol>
+)}
+{block.type === "list" && !block.ordered && (
+  <ul>{block.items.map((it) => <li><Blocks blocks={it.content} footnotes={footnotes} /></li>)}</ul>
+)}
+
+{block.type === "blockquote" && <blockquote><Blocks blocks={block.content} footnotes={footnotes} /></blockquote>}
+{block.type === "callout" && <div class="callout"><Blocks blocks={block.content} footnotes={footnotes} /></div>}
+{block.type === "center" && <div class="center-block"><Blocks blocks={block.content} footnotes={footnotes} /></div>}
+{block.type === "verbatim" && <pre class="verbatim">{block.value}</pre>}
+
+{block.type === "epigraph" && (
+  <div class="epigraph">
+    {block.lines.map((line) => <div class="epigraph-line"><Inline nodes={line} footnotes={footnotes} /></div>)}
+    {block.attribution && <div class="epigraph-attr"><Inline nodes={block.attribution} footnotes={footnotes} /></div>}
+  </div>
+)}
+
+{block.type === "figure" && <Figure node={block} footnotes={footnotes} />}
+{block.type === "table" && <Table node={block} footnotes={footnotes} />}
+{block.type === "modelExample" && <ModelExample node={block} footnotes={footnotes} />}

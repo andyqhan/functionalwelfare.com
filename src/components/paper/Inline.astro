@@ -1,0 +1,11 @@
+---
+import InlineNode from "./InlineNode.astro";
+import type { Inline, Footnote } from "../../lib/ir";
+
+interface Props {
+  nodes: Inline[];
+  footnotes?: Footnote[];
+}
+const { nodes, footnotes = [] } = Astro.props;
+---
+{nodes.map((node) => <InlineNode node={node} footnotes={footnotes} />)}

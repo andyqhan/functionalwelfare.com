@@ -1,0 +1,34 @@
+---
+import Inline from "./Inline.astro";
+import { figureOverrides } from "../overrides/figures";
+import type { FigureBlock, Footnote } from "../../lib/ir";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const Override = figureOverrides[node.label];
+---
+{Override ? (
+  <Override node={node} footnotes={footnotes} />
+) : (
+  <figure id={node.label} class={`fig fig-${node.layout}`}>
+    <div class="fig-items">
+      {node.items.map((item) => (
+        <img
+          src={item.svg ?? item.png}
+          alt={item.alt ?? (node.number ? `Figure ${node.number}` : "figure")}
+          style={item.widthFrac ? `width:${Math.round(item.widthFrac * 100)}%` : undefined}
+          loading="lazy"
+        />
+      ))}
+    </div>
+    {(node.caption.length > 0 || node.number) && (
+      <figcaption>
+        {node.number && <span class="cap-label">Figure {node.number}.</span>}{" "}
+        <Inline nodes={node.caption} footnotes={footnotes} />
+      </figcaption>
+    )}
+  </figure>
+)}

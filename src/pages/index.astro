@@ -1,0 +1,37 @@
+---
+import PaperLayout from "../layouts/PaperLayout.astro";
+import Blocks from "../components/paper/Blocks.astro";
+import Inline from "../components/paper/Inline.astro";
+import References from "../components/References.astro";
+import { manifest, mainUnits } from "../lib/ir";
+
+const plainTitle = manifest.title.map((n) => (n.type === "text" ? n.value : n.type === "break" ? " " : "")).join("").trim();
+const units = mainUnits();
+---
+<PaperLayout title={plainTitle}>
+  <article class="paper">
+    <header class="paper-header">
+      <h1 class="paper-title"><Inline nodes={manifest.title} /></h1>
+      <div class="authors">
+        {manifest.authors.map((a) => <span class="author"><Inline nodes={a.name} /></span>)}
+      </div>
+      {manifest.affiliation && <div class="affiliation"><Inline nodes={manifest.affiliation} /></div>}
+      {manifest.repoUrl && (
+        <div class="repo"><a href={manifest.repoUrl} target="_blank" rel="noopener">{manifest.repoUrl}</a></div>
+      )}
+      <div class="abstract">
+        <h2 class="abstract-label">Abstract</h2>
+        <Blocks blocks={manifest.abstract} />
+      </div>
+      {manifest.epigraph && <Blocks blocks={[manifest.epigraph]} />}
+    </header>
+
+    {units.map((u) => (
+      <section class="unit" id={u.slug} data-slug={u.slug}>
+        <Blocks blocks={u.blocks} footnotes={u.footnotes} />
+      </section>
+    ))}
+
+    <References />
+  </article>
+</PaperLayout>

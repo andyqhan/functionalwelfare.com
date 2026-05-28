@@ -1,0 +1,54 @@
+---
+import Inline from "./paper/Inline.astro";
+import { manifest, unitPath } from "../lib/ir";
+import type { TocEntry } from "../lib/ir";
+
+interface Props {
+  currentSlug?: string;
+}
+const { currentSlug } = Astro.props;
+
+const kindBySlug = new Map(manifest.units.map((u) => [u.slug, u.kind]));
+function href(entry: TocEntry): string {
+  const base = unitPath(entry.slug);
+  return `${base === "/" ? "" : base}#${entry.id}`;
+}
+const mainEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "main");
+const appendixEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "appendix");
+---
+<nav class="toc" aria-label="Table of contents">
+  <a class="toc-title" href="/">How's it going?</a>
+  <ol class="toc-list">
+    {mainEntries.map((e) => (
+      <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>
+        <a href={href(e)}>
+          {e.number && <span class="toc-num">{e.number}</span>}
+          <Inline nodes={e.title} />
+        </a>
+        {e.children.length > 0 && (
+          <ol class="toc-sub">
+            {e.children.map((c) => (
+              <li><a href={href(c)}>{c.number && <span class="toc-num">{c.number}</span>}<Inline nodes={c.title} /></a></li>
+            ))}
+          </ol>
+        )}
+      </li>
+    ))}
+    <li class="toc-item"><a href="/#references">References</a></li>
+  </ol>
+  {appendixEntries.length > 0 && (
+    <>
+      <div class="toc-divider">Appendix</div>
+      <ol class="toc-list toc-appendix">
+        {appendixEntries.map((e) => (
+          <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>
+            <a href={href(e)}>
+              {e.number && <span class="toc-num">{e.number}</span>}
+              <Inline nodes={e.title} />
+            </a>
+          </li>
+        ))}
+      </ol>
+    </>
+  )}
+</nav>

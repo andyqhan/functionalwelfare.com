@@ -10,6 +10,7 @@
   --cap-margin: 11rem;       /* left gutter for figure captions (wide screens) */
   --gap: 1.5rem;
   --sidebar-w: 13.5rem;
+  --hdr-breakout: clamp(0rem, 3vw, 4rem); /* title block extends past the paper */
 
   --ink: #272622;
   --muted: #6f7178;
@@ -115,18 +116,23 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .inline-img { vertical-align: middle; }
 .xref { color: var(--accent-deep); white-space: nowrap; }
 
-/* ----------------------- authors / abstract ----------------------------- */
+/* ----------------------- header: title / abstract ----------------------- */
+/* Default (stacked): flex column. hdr-left is transparent so its children and
+   the abstract order together: title, byline, github, abstract, epigraph. */
+.paper-header { display: flex; flex-direction: column; }
+.hdr-left { display: contents; }
+.paper-title { order: 1; margin: 0 0 0.5rem; }
+.byline { order: 2; margin: 0 0 0.4rem; }
+.repo { order: 3; margin: 0; font-size: 0.85rem; }
+.abstract { order: 4; margin: 1.6rem 0 0; font-size: 0.97em; }
+.epigraph-wrap { order: 5; margin-top: 1.4rem; }
 
-.byline { margin-bottom: 0.3rem; }
 .authors { font-size: 1.12rem; }
 .author:not(:last-child)::after { content: " · "; color: var(--muted); }
 .affiliation { color: var(--muted); font-style: italic; }
-.repo { margin-top: 0.2rem; font-size: 0.85rem; }
 .repo a { font-family: var(--mono); }
-.abstract { margin: 1.9rem 0; font-size: 0.97em; }
 .abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
 
-.epigraph-wrap { margin-top: 1.6rem; }
 .epigraph { margin: 0; font-style: italic; color: #56554f; text-align: left; }
 .epigraph-line { line-height: 1.5; }
 .epigraph-attr { margin-top: 0.4rem; font-size: 0.85em; }
@@ -239,6 +245,7 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 /* ====================== enhanced wide desktop =========================== */
 /* Left caption gutter + two-column title/abstract header. */
 @media (min-width: 1400px) {
+  :root { --cap-margin: 10rem; --note-margin: 10rem; }
   .paper { max-width: calc(var(--cap-margin) + var(--gap) + var(--measure) + var(--gap) + var(--note-margin)); }
   .unit { padding-left: calc(var(--cap-margin) + var(--gap)); }
 
@@ -248,19 +255,20 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
     column-gap: var(--gap);
   }
 
+  /* Title block: break out wider than the paper; title + meta + epigraph on the
+     left (tightly stacked), abstract on the right. */
   .paper-header {
-    padding: 0;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 3rem;
+    grid-template-columns: 1.05fr 1fr;
+    column-gap: 3.2rem;
     align-items: start;
-    grid-template-areas: "title abstract" "byline abstract" "repo abstract" "epi abstract";
+    padding: 0;
+    margin-left: calc(-1 * var(--hdr-breakout));
+    margin-right: calc(-1 * var(--hdr-breakout));
   }
-  .paper-title { grid-area: title; margin-top: 0.2rem; }
-  .byline { grid-area: byline; }
-  .repo { grid-area: repo; }
-  .epigraph-wrap { grid-area: epi; }
-  .abstract { grid-area: abstract; margin: 0.2rem 0 0; }
+  .hdr-left { display: block; }
+  .paper-title { margin: 0 0 0.5rem; }
+  .abstract { margin: 0.15rem 0 0; }
 }
 
 /* ============================ responsive ================================= */

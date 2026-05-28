@@ -22,18 +22,56 @@ const { title, currentSlug } = Astro.props;
       href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap"
       rel="stylesheet"
     />
+    <script is:inline>
+      // Restore a user-chosen sidebar width before first paint (no flash).
+      try {
+        const w = localStorage.getItem("fw-sidebar-w");
+        if (w) document.documentElement.style.setProperty("--sidebar-w", w);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <button id="toc-toggle" aria-label="Toggle contents">☰</button>
     <aside class="sidebar">
       <Toc currentSlug={currentSlug} />
     </aside>
+    <div class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" title="Drag to resize · double-click to reset"></div>
     <main class="content">
       <slot />
     </main>
     <script is:inline>
-      const t = document.getElementById("toc-toggle");
-      t && t.addEventListener("click", () => document.body.classList.toggle("toc-open"));
+      const toggle = document.getElementById("toc-toggle");
+      toggle && toggle.addEventListener("click", () => document.body.classList.toggle("toc-open"));
+
+      const rez = document.querySelector(".sidebar-resizer");
+      if (rez) {
+        const root = document.documentElement;
+        const clamp = (x) => Math.max(190, Math.min(440, x));
+        let dragging = false;
+        rez.addEventListener("pointerdown", (e) => {
+          dragging = true;
+          document.body.classList.add("resizing");
+          rez.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        });
+        rez.addEventListener("pointermove", (e) => {
+          if (dragging) root.style.setProperty("--sidebar-w", clamp(e.clientX) + "px");
+        });
+        const end = () => {
+          if (!dragging) return;
+          dragging = false;
+          document.body.classList.remove("resizing");
+          try {
+            localStorage.setItem("fw-sidebar-w", getComputedStyle(root).getPropertyValue("--sidebar-w").trim());
+          } catch (e) {}
+        };
+        rez.addEventListener("pointerup", end);
+        rez.addEventListener("pointercancel", end);
+        rez.addEventListener("dblclick", () => {
+          root.style.removeProperty("--sidebar-w");
+          try { localStorage.removeItem("fw-sidebar-w"); } catch (e) {}
+        });
+      }
     </script>
   </body>
 </html>

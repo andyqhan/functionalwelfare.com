@@ -5,15 +5,14 @@
    =========================================================================== */
 
 :root {
-  --measure: 37rem;          /* main reading column */
-  --note-margin: 11rem;      /* right margin for footnote sidenotes */
-  --cap-margin: 11rem;       /* left gutter for figure captions (wide screens) */
-  --gap: 1.5rem;
-  --sidebar-w: 13.5rem;
+  --measure: 41rem;          /* main reading column (~20% wider) */
+  --note-margin: 9rem;       /* right margin for footnote sidenotes */
+  --cap-margin: 11rem;       /* caption gutter; enhanced layout widens to 13rem */
+  --gap: 1.4rem;
+  --sidebar-w: 13rem;        /* user-resizable (see PaperLayout) */
   /* Title block extends past the paper toward the window edges. Derived from
-     available space (50vw − sidebar/2 − paper/2 − gap) so it never collides
-     with the sidebar; capped so it stops ~2rem from each edge. */
-  --hdr-breakout: clamp(0rem, calc(50vw - 39rem), 10rem);
+     available space so it tracks the (resizable) sidebar and never collides. */
+  --hdr-breakout: clamp(0rem, calc(50vw - var(--sidebar-w) / 2 - 34rem), 12rem);
 
   --ink: #272622;
   --muted: #6f7178;
@@ -33,7 +32,7 @@
 * { box-sizing: border-box; }
 
 html {
-  font-size: 18px;
+  font-size: 19px;
   scroll-behavior: smooth;
   scroll-padding-top: 1.5rem;
   -webkit-text-size-adjust: 100%;
@@ -44,8 +43,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 1.19rem;
-  line-height: 1.6;
+  font-size: 1.2rem;
+  line-height: 1.62;
   overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -78,18 +77,18 @@ body {
 /* ------------------------------ headings -------------------------------- */
 
 .paper-title {
-  font-size: 2.5rem;
-  line-height: 1.13;
+  font-size: 2.7rem;
+  line-height: 1.12;
   font-weight: 700;
   margin: 0 0 1.1rem;
   letter-spacing: -0.012em;
   text-wrap: balance;
 }
-.heading { font-weight: 700; line-height: 1.22; scroll-margin-top: 1.5rem; text-wrap: pretty; }
-.heading.lvl-1 { font-size: 1.78rem; margin: 3rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
-.heading.lvl-2 { font-size: 1.32rem; margin: 2.1rem 0 0.6rem; }
-.heading.lvl-3 { font-size: 1.1rem; margin: 1.6rem 0 0.5rem; }
-.heading.lvl-4 { font-size: 1rem; margin: 1.3rem 0 0.4rem; font-style: italic; }
+.heading { font-weight: 700; line-height: 1.2; scroll-margin-top: 1.5rem; text-wrap: pretty; }
+.heading.lvl-1 { font-size: 2.1rem; margin: 3.2rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
+.heading.lvl-2 { font-size: 1.58rem; margin: 2.2rem 0 0.6rem; }
+.heading.lvl-3 { font-size: 1.28rem; margin: 1.7rem 0 0.5rem; }
+.heading.lvl-4 { font-size: 1.1rem; margin: 1.4rem 0 0.4rem; font-style: italic; }
 .sec-num { color: var(--accent); font-weight: 700; margin-right: 0.4em; }
 .anchor { opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none; font-size: 0.8em; transition: opacity 0.15s; }
 .heading:hover .anchor { opacity: 0.5; }
@@ -174,30 +173,34 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 
 /* ------------------------------ figures --------------------------------- */
 
+/* Figures and tables share a layout: caption in a left column, content on the
+   right (and, in the enhanced layout, the caption hangs in the left gutter and
+   the content centers over the text column). */
 .unit > .fig,
 .unit > .tbl { margin-right: calc(-1 * (var(--note-margin) + var(--gap))); clear: right; }
 
-.fig {
+.fig, .tbl {
   display: grid;
   grid-template-columns: minmax(9rem, 12rem) 1fr;
   column-gap: 1.6rem;
   align-items: start;
   margin: 2.4rem 0;
 }
-.fig > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: left; margin: 0; }
-.fig > .fig-items { grid-column: 2; grid-row: 1; }
+.fig > figcaption,
+.tbl > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: left; margin: 0; }
+.fig > .fig-items,
+.tbl > .tbl-body { grid-column: 2; grid-row: 1; min-width: 0; }
 .fig-items { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; align-items: flex-end; }
 .fig-items img { max-width: 100%; height: auto; }
+.tbl-body { text-align: center; }
 
 figcaption { font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
 .cap-label { font-weight: 700; color: var(--ink); display: block; margin-bottom: 0.2rem; }
 
 /* ------------------------------- tables --------------------------------- */
 
-.tbl { margin: 2.2rem 0; }
-.tbl > figcaption { margin: 0 0 0.6rem; max-width: var(--measure); }
 .tbl-scroll { overflow-x: auto; }
-.tbl table { border-collapse: collapse; font-size: 0.82rem; line-height: 1.4; margin: 0 auto; }
+.tbl table { border-collapse: collapse; font-size: 0.82rem; line-height: 1.4; margin: 0 auto; text-align: left; }
 .tbl th, .tbl td { padding: 0.3em 0.7em; vertical-align: top; }
 .tbl th { font-weight: 700; border-bottom: 1.5px solid var(--ink); }
 .tbl tr:first-child th { border-top: 1.5px solid var(--ink); }
@@ -245,15 +248,32 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 
 #toc-toggle { display: none; position: fixed; top: 0.9rem; left: 0.9rem; z-index: 20; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; width: 2.5rem; height: 2.5rem; font-size: 1.1rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
 
+/* draggable sidebar width handle (tracks the resizable --sidebar-w) */
+.sidebar-resizer { position: fixed; top: 0; left: var(--sidebar-w); width: 11px; height: 100%; transform: translateX(-5px); cursor: col-resize; z-index: 30; touch-action: none; }
+.sidebar-resizer::after { content: ""; position: absolute; inset: 0 5px; background: transparent; transition: background 0.12s; }
+.sidebar-resizer:hover::after, body.resizing .sidebar-resizer::after { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+
 /* ====================== enhanced wide desktop =========================== */
 /* Left caption gutter + two-column title/abstract header. */
-@media (min-width: 1400px) {
-  :root { --cap-margin: 10rem; --note-margin: 10rem; }
+@media (min-width: 1560px) {
+  :root { --cap-margin: 13rem; --note-margin: 9rem; }
   .paper { max-width: calc(var(--cap-margin) + var(--gap) + var(--measure) + var(--gap) + var(--note-margin)); }
   .unit { padding-left: calc(var(--cap-margin) + var(--gap)); }
 
-  .unit > .fig {
+  /* Section headings (and subheadings) hang into the left gutter, starting at the
+     same left edge as figure/table captions and overhanging the body text.
+     Targets the lvl classes so it overrides their margin shorthands. */
+  .heading.lvl-1,
+  .heading.lvl-2,
+  .heading.lvl-3 { margin-left: calc(-1 * (var(--cap-margin) + var(--gap))); }
+
+  /* Figures + tables: caption hangs in the gutter; content is centered over the
+     text column (no longer breaking into the right note margin). */
+  .unit > .fig,
+  .unit > .tbl {
     margin-left: calc(-1 * (var(--cap-margin) + var(--gap)));
+    margin-right: 0;
     grid-template-columns: var(--cap-margin) 1fr;
     column-gap: var(--gap);
   }
@@ -263,7 +283,7 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
   .paper-header {
     display: grid;
     grid-template-columns: 1.05fr 1fr;
-    column-gap: 3.2rem;
+    column-gap: 3.4rem;
     align-items: start;
     padding: 0;
     margin-left: calc(-1 * var(--hdr-breakout));
@@ -277,7 +297,7 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 /* ============================ responsive ================================= */
 
 /* No room for the right footnote margin: footnotes flow inline. */
-@media (max-width: 1179px) {
+@media (max-width: 1300px) {
   .unit, .paper-header { padding-right: 0; }
   .paper { max-width: var(--measure); }
   .unit > .fig, .unit > .tbl { margin-right: 0; }
@@ -295,12 +315,13 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
   .sidebar { transform: translateX(-100%); transition: transform 0.22s ease; z-index: 15; box-shadow: 2px 0 14px rgba(0,0,0,0.12); }
   body.toc-open .sidebar { transform: none; }
   .content { margin-left: 0; padding: 4.5rem clamp(1.1rem, 5vw, 3rem) 6rem; }
+  .sidebar-resizer { display: none; }
 }
 
-/* Stack figure captions below the image. */
+/* Stack figure/table captions below the content. */
 @media (max-width: 900px) {
-  .fig { display: block; }
-  .fig > .fig-items { margin-bottom: 0.5rem; }
+  .fig, .tbl { display: block; }
+  .fig > .fig-items, .tbl > .tbl-body { margin-bottom: 0.5rem; }
 }
 
 /* Phone tightening. */

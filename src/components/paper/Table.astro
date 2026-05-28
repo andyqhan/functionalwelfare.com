@@ -15,37 +15,39 @@ const rows = node.rows ?? [];
   <Override node={node} footnotes={footnotes} />
 ) : (
   <figure id={node.label} class="tbl">
+    <div class="tbl-body">
+      {node.kind === "image" ? (
+        <img class="tbl-img" src={node.asImage?.svg ?? node.asImage?.png} alt={node.number ? `Table ${node.number}` : "table"} loading="lazy" />
+      ) : (
+        <div class="tbl-scroll">
+          <table>
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr>
+                  {row.map((cell) => {
+                    const Cell = (ri === 0 ? "th" : "td") as any;
+                    return (
+                      <Cell
+                        colspan={cell.colspan > 1 ? cell.colspan : undefined}
+                        class={`al-${cell.align}${cell.ruleAbove ? " rule-above" : ""}`}
+                        style={cell.bg ? `background:${cell.bg}` : undefined}
+                      >
+                        <Inline nodes={cell.content} footnotes={footnotes} />
+                      </Cell>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
     {(node.caption.length > 0 || node.number) && (
       <figcaption>
         {node.number && <span class="cap-label">Table {node.number}.</span>}{" "}
         <Inline nodes={node.caption} footnotes={footnotes} />
       </figcaption>
-    )}
-    {node.kind === "image" ? (
-      <img class="tbl-img" src={node.asImage?.svg ?? node.asImage?.png} alt={node.number ? `Table ${node.number}` : "table"} loading="lazy" />
-    ) : (
-      <div class="tbl-scroll">
-        <table>
-          <tbody>
-            {rows.map((row, ri) => (
-              <tr>
-                {row.map((cell) => {
-                  const Cell = (ri === 0 ? "th" : "td") as any;
-                  return (
-                    <Cell
-                      colspan={cell.colspan > 1 ? cell.colspan : undefined}
-                      class={`al-${cell.align}${cell.ruleAbove ? " rule-above" : ""}`}
-                      style={cell.bg ? `background:${cell.bg}` : undefined}
-                    >
-                      <Inline nodes={cell.content} footnotes={footnotes} />
-                    </Cell>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     )}
   </figure>
 )}

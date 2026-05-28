@@ -444,7 +444,8 @@ export function transformBlocks(nodes: Ast.Node[], ctx: Ctx): Block[] {
       if (n.content === "label") {
         const lb = lastBlock();
         const key = plainText(mArg(n)).trim();
-        if (trimNodes(para).length === 0 && lb && "label" in lb) {
+        // attach to the preceding heading/equation when the label stands alone
+        if (trimNodes(para).length === 0 && lb && (lb.type === "heading" || lb.type === "mathBlock")) {
           (lb as any).label = key;
           const id = (lb as any).id ?? ctx.makeId(slugifyLabel(key));
           (lb as any).id = id;

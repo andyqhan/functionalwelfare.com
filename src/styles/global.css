@@ -1,23 +1,23 @@
 /* ===========================================================================
-   functionalwelfare.com — baseline typography & layout.
-   (Design pass: Cardo, constrained measure, sidebar TOC, margin sidenotes,
-   pastel-blue theme. This is the foundation the later design phase builds on.)
+   functionalwelfare.com — typography & layout.
+   Cardo throughout · wide justified measure · left figure captions ·
+   right-margin sidenotes & references · responsive down to mobile.
    =========================================================================== */
 
 :root {
-  --measure: 34rem;        /* main text column width */
-  --gutter: 16rem;         /* right margin for sidenotes */
-  --gap: 1.75rem;          /* space between text and gutter */
-  --sidebar-w: 17rem;
+  --measure: 41rem;          /* main reading column */
+  --note-margin: 14rem;      /* right margin for sidenotes + references */
+  --gap: 2rem;               /* space between text and margin */
+  --sidebar-w: 16rem;
 
-  --ink: #2a2a2e;
-  --muted: #71727a;
-  --bg: #fbfbf9;
+  --ink: #272622;
+  --muted: #6f7178;
+  --bg: #fcfbf8;
   --paper: #ffffff;
   --accent: #4f7fab;
-  --accent-deep: #3a6491;
+  --accent-deep: #36608e;
   --accent-soft: #eef3f8;
-  --rule: #e4e4dd;
+  --rule: #e6e4db;
   --hl-red: #ffd9dd;
   --hl-green: #d6ead4;
 
@@ -27,20 +27,26 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  font-size: 18px;           /* global scale; everything sizes in rem off this */
+  scroll-behavior: smooth;
+  scroll-padding-top: 1.5rem;
+  -webkit-text-size-adjust: 100%;
+}
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 19px;
-  line-height: 1.62;
+  font-size: 1.18rem;        /* ~21px reading text */
+  line-height: 1.6;
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* ----------------------------- layout ----------------------------------- */
+/* ------------------------------ layout ---------------------------------- */
 
 .sidebar {
   position: fixed;
@@ -49,55 +55,49 @@ body {
   overflow-y: auto;
   padding: 2.2rem 1.1rem 3rem 1.6rem;
   border-right: 1px solid var(--rule);
-  background: #fafaf7;
+  background: #faf9f5;
 }
 .content {
   margin-left: var(--sidebar-w);
-  padding: 3.5rem 3rem 8rem;
+  padding: 3.5rem clamp(1.5rem, 4vw, 4rem) 8rem;
 }
 .paper {
-  max-width: calc(var(--measure) + var(--gap) + var(--gutter));
+  max-width: calc(var(--measure) + var(--gap) + var(--note-margin));
   margin: 0 auto;
 }
 
-/* Constrain prose to the measure; reserve the right gutter for sidenotes. */
-.paper-header,
-.unit > p, .unit > ul, .unit > ol, .unit > blockquote,
-.unit > .math-display, .unit > .model-example, .unit > .callout,
-.unit > .heading, .references {
-  max-width: var(--measure);
-}
-.unit, .paper-header, .references { padding-right: calc(var(--gutter) + var(--gap)); }
+/* Reserve the right margin; children then fill the measure automatically. */
+.unit,
+.paper-header { padding-right: calc(var(--note-margin) + var(--gap)); }
 
-@media (max-width: 1180px) {
-  .paper { max-width: var(--measure); }
-  .unit, .paper-header, .references { padding-right: 0; }
-}
-
-/* ----------------------------- headings --------------------------------- */
+/* ------------------------------ headings -------------------------------- */
 
 .paper-title {
-  font-size: 2.1rem;
-  line-height: 1.18;
+  font-size: 2.4rem;
+  line-height: 1.15;
   font-weight: 700;
-  margin: 0 0 1.2rem;
-  letter-spacing: -0.01em;
+  margin: 0 0 1.1rem;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
 }
-.heading { font-weight: 700; line-height: 1.25; scroll-margin-top: 1.5rem; position: relative; }
-.heading.lvl-1 { font-size: 1.55rem; margin: 2.8rem 0 0.9rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
-.heading.lvl-2 { font-size: 1.22rem; margin: 2rem 0 0.6rem; }
-.heading.lvl-3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; }
-.heading.lvl-4 { font-size: 1rem; margin: 1.2rem 0 0.4rem; font-style: italic; }
-.sec-num { color: var(--accent); font-weight: 700; margin-right: 0.5em; }
-.anchor {
-  opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none;
-  font-size: 0.8em; transition: opacity 0.15s;
-}
+.heading { font-weight: 700; line-height: 1.22; scroll-margin-top: 1.5rem; text-wrap: pretty; }
+.heading.lvl-1 { font-size: 1.75rem; margin: 3rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
+.heading.lvl-2 { font-size: 1.3rem; margin: 2.1rem 0 0.6rem; }
+.heading.lvl-3 { font-size: 1.1rem; margin: 1.6rem 0 0.5rem; }
+.heading.lvl-4 { font-size: 1rem; margin: 1.3rem 0 0.4rem; font-style: italic; }
+.sec-num { color: var(--accent); font-weight: 700; margin-right: 0.45em; }
+.anchor { opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none; font-size: 0.8em; transition: opacity 0.15s; }
 .heading:hover .anchor { opacity: 0.5; }
 
-/* ----------------------------- text ------------------------------------- */
+/* -------------------------------- text ---------------------------------- */
 
-p { margin: 0 0 1rem; }
+p {
+  margin: 0 0 1.05rem;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 2;
+}
 a { color: var(--accent-deep); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .sc { font-variant: small-caps; letter-spacing: 0.02em; }
@@ -105,11 +105,15 @@ a:hover { text-decoration: underline; }
 em { font-style: italic; }
 strong { font-weight: 700; }
 
-code, .mono { font-family: var(--mono); font-size: 0.86em; }
-code { background: #f1f1ee; padding: 0.05em 0.32em; border-radius: 3px; }
+ul, ol { margin: 0 0 1.05rem; padding-left: 1.5rem; }
+li { margin: 0.2rem 0; text-align: justify; hyphens: auto; }
+
+code, .mono { font-family: var(--mono); font-size: 0.82em; font-feature-settings: "liga" 0, "calt" 0; }
+code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .tok {
-  font-family: var(--mono); font-size: 0.82em; background: #eef0f3;
+  font-family: var(--mono); font-size: 0.8em; background: #eef0f3;
   border: 1px solid #e0e3e8; border-radius: 3px; padding: 0.02em 0.3em; white-space: pre;
+  font-feature-settings: "liga" 0, "calt" 0;
 }
 
 .hl { padding: 0.05em 0.18em; border-radius: 2px; }
@@ -120,77 +124,76 @@ code { background: #f1f1ee; padding: 0.05em 0.32em; border-radius: 3px; }
 .inline-img { vertical-align: middle; }
 
 .xref { color: var(--accent-deep); white-space: nowrap; }
-.cite { color: var(--accent); }
 
 /* ----------------------- authors / abstract ----------------------------- */
 
-.authors { font-size: 1.05rem; margin-bottom: 0.2rem; }
+.authors { font-size: 1.12rem; margin-bottom: 0.2rem; }
 .author:not(:last-child)::after { content: " · "; color: var(--muted); }
 .affiliation { color: var(--muted); font-style: italic; }
-.repo { margin-top: 0.4rem; font-size: 0.85rem; }
+.repo { margin-top: 0.45rem; font-size: 0.85rem; }
 .repo a { font-family: var(--mono); }
-.abstract { margin: 1.8rem 0; padding: 0.2rem 0 0; }
-.abstract-label {
-  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--accent); font-weight: 700; margin: 0 0 0.4rem;
-}
+.abstract { margin: 1.9rem 0; }
+.abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
 .abstract { font-size: 0.97em; }
 
-.epigraph { margin: 2rem 0 1rem; font-style: italic; color: #555; text-align: center; }
+.epigraph { margin: 2.2rem 0 1rem; font-style: italic; color: #56554f; text-align: center; }
 .epigraph-line { line-height: 1.5; }
 .epigraph-attr { margin-top: 0.4rem; font-size: 0.85em; }
 
-/* ----------------------------- sidenotes -------------------------------- */
+/* ----------------- sidenotes & margin references ------------------------ */
 
-.fn { }
 .fn-mark { color: var(--accent); font-weight: 700; font-size: 0.7em; }
+.cite { color: var(--accent); }
+.cite-wrap { }
+
 .sidenote {
   float: right;
   clear: right;
-  width: var(--gutter);
-  margin-right: calc(-1 * (var(--gutter) + var(--gap)));
-  margin-bottom: 0.8rem;
-  font-size: 0.78rem;
-  line-height: 1.45;
+  width: var(--note-margin);
+  margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
+  margin-bottom: 0.85rem;
+  font-size: 0.74rem;
+  line-height: 1.42;
   color: var(--muted);
   text-align: left;
+  hyphens: auto;
 }
 .sidenote .fn-mark { margin-right: 0.3em; }
-@media (max-width: 1180px) {
-  .sidenote {
-    float: none; width: auto; margin: 0.6rem 0; padding: 0.6rem 0.9rem;
-    background: var(--accent-soft); border-radius: 4px; display: block;
-  }
+.cite-note .ref-item { display: block; margin-bottom: 0.45rem; }
+.cite-note .ref-item:last-child { margin-bottom: 0; }
+.ref-num { font-weight: 700; color: var(--accent); margin-right: 0.3em; }
+
+/* ------------------------------ figures --------------------------------- */
+
+/* Break figures/tables out to the full width, including the note margin. */
+.unit > .fig,
+.unit > .tbl {
+  margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
+  clear: right;
 }
 
-/* ----------------------------- figures ---------------------------------- */
-
-.fig { margin: 1.8rem 0; text-align: center; }
-.fig-items { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; align-items: flex-end; }
-.fig-single .fig-items img { max-width: 100%; }
-.fig img { max-width: 100%; height: auto; }
-figcaption {
-  font-size: 0.82rem; line-height: 1.45; color: var(--muted);
-  margin-top: 0.6rem; text-align: left;
+.fig {
+  display: grid;
+  grid-template-columns: minmax(10rem, 13rem) 1fr;
+  column-gap: 1.8rem;
+  align-items: start;
+  margin: 2.4rem 0;
 }
-.cap-label { font-weight: 700; color: var(--ink); }
+.fig > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: left; margin: 0; }
+.fig > .fig-items { grid-column: 2; grid-row: 1; }
+.fig-items { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; align-items: flex-end; }
+.fig-items img { max-width: 100%; height: auto; }
 
-/* Let multi-panel figures and tables use the full width incl. the gutter. */
-.unit > .fig, .unit > .tbl {
-  max-width: calc(var(--measure) + var(--gap) + var(--gutter));
-  margin-right: calc(-1 * (var(--gutter) + var(--gap)));
-}
-@media (max-width: 1180px) {
-  .unit > .fig, .unit > .tbl { margin-right: 0; max-width: 100%; }
-}
+figcaption { font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
+.cap-label { font-weight: 700; color: var(--ink); display: block; margin-bottom: 0.2rem; }
 
-/* ----------------------------- tables ----------------------------------- */
+/* ------------------------------- tables --------------------------------- */
 
-.tbl { margin: 1.8rem 0; }
-.tbl figcaption { margin: 0 0 0.6rem; text-align: left; }
+.tbl { margin: 2.2rem 0; }
+.tbl > figcaption { margin: 0 0 0.6rem; max-width: var(--measure); }
 .tbl-scroll { overflow-x: auto; }
-.tbl table { border-collapse: collapse; font-size: 0.8rem; line-height: 1.4; margin: 0 auto; }
-.tbl th, .tbl td { padding: 0.28em 0.7em; vertical-align: top; }
+.tbl table { border-collapse: collapse; font-size: 0.82rem; line-height: 1.4; margin: 0 auto; }
+.tbl th, .tbl td { padding: 0.3em 0.7em; vertical-align: top; }
 .tbl th { font-weight: 700; border-bottom: 1.5px solid var(--ink); }
 .tbl tr:first-child th { border-top: 1.5px solid var(--ink); }
 .tbl .rule-above { border-top: 1px solid var(--rule); }
@@ -202,74 +205,91 @@ figcaption {
 /* --------------------------- model examples ----------------------------- */
 
 .model-example {
-  margin: 1.4rem 0; padding: 0.8rem 1.1rem;
+  margin: 1.5rem 0; padding: 0.85rem 1.15rem;
   background: #f7f7fa; border-left: 3px solid var(--accent);
   font-size: 0.92em; border-radius: 0 4px 4px 0;
 }
-.model-example > div { margin: 0.3rem 0; }
+.model-example > div { margin: 0.35rem 0; }
+.model-example p { text-align: left; }
 .ex-meta { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
 .ex-label { font-style: italic; color: var(--accent-deep); }
 .ex-response { white-space: pre-wrap; }
 
-.callout {
-  margin: 1.4rem 0; padding: 0.8rem 1.1rem; background: var(--accent-soft);
-  border-radius: 5px; font-size: 0.95em;
-}
+.callout { margin: 1.5rem 0; padding: 0.85rem 1.15rem; background: var(--accent-soft); border-radius: 5px; font-size: 0.95em; }
 .verbatim {
   font-family: var(--mono); font-size: 0.78rem; line-height: 1.5;
-  background: #f6f6f3; border: 1px solid var(--rule); border-left: 3px solid var(--accent);
-  padding: 0.8rem 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 0 4px 4px 0;
+  background: #f6f6f2; border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+  padding: 0.85rem 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 0 4px 4px 0;
+  font-feature-settings: "liga" 0, "calt" 0;
 }
+blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(--rule); color: #4a4943; font-style: italic; }
 
-/* ------------------------------- math ----------------------------------- */
+/* -------------------------------- math ---------------------------------- */
 
-.math-display {
-  display: flex; align-items: center; justify-content: center; gap: 1rem;
-  margin: 1.3rem 0; overflow-x: auto;
-}
+.math-display { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.4rem 0; overflow-x: auto; }
 .math-display .eq-num { color: var(--muted); font-size: 0.9rem; }
-.katex { font-size: 1.05em; }
+.katex { font-size: 1.04em; }
 
-/* ---------------------------- references -------------------------------- */
+/* --------------------------------- TOC ---------------------------------- */
 
-.references { margin-top: 3rem; }
-.ref-list { font-size: 0.82rem; line-height: 1.5; padding-left: 2.2rem; }
-.ref-list li { margin-bottom: 0.5rem; }
-.ref-list li::marker { color: var(--muted); }
-
-/* ------------------------------- TOC ------------------------------------ */
-
-.toc { font-size: 0.82rem; line-height: 1.35; }
-.toc-title { display: block; font-weight: 700; font-size: 1rem; margin-bottom: 1rem; color: var(--ink); }
+.toc { font-size: 0.84rem; line-height: 1.32; }
+.toc li { text-align: left; hyphens: manual; margin: 0; }
+.toc-label { hyphens: manual; }
+.toc-title { display: block; font-weight: 700; font-size: 1.02rem; margin-bottom: 1rem; color: var(--ink); line-height: 1.2; }
 .toc-list { list-style: none; margin: 0; padding: 0; }
-.toc-item > a { display: block; padding: 0.16rem 0; color: #444; }
+.toc-item > a { display: grid; grid-template-columns: 1.7em 1fr; column-gap: 0.15em; align-items: baseline; padding: 0.2rem 0; color: #45443f; }
 .toc-item.current > a { color: var(--accent-deep); font-weight: 700; }
 .toc-item > a:hover { color: var(--accent-deep); text-decoration: none; }
-.toc-num { color: var(--accent); font-weight: 700; margin-right: 0.4em; }
-.toc-sub { list-style: none; margin: 0 0 0.3rem; padding-left: 1rem; }
-.toc-sub a { display: block; padding: 0.1rem 0; color: var(--muted); font-size: 0.95em; }
-.toc-divider {
-  margin: 1.2rem 0 0.5rem; font-size: 0.7rem; text-transform: uppercase;
-  letter-spacing: 0.12em; color: var(--accent); font-weight: 700;
-}
-.toc-appendix .toc-item > a { font-size: 0.95em; }
+.toc-num { color: var(--accent); font-weight: 700; }
+.toc-sub { list-style: none; margin: 0 0 0.35rem; padding-left: 1.7em; }
+.toc-sub a { display: grid; grid-template-columns: 2.3em 1fr; column-gap: 0.15em; align-items: baseline; padding: 0.12rem 0; color: var(--muted); font-size: 0.95em; }
+.toc-divider { margin: 1.3rem 0 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; }
 
-.appendix-nav {
-  display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem;
-  padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.85rem;
-  max-width: var(--measure);
-}
+.appendix-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.88rem; }
 
-/* ------------------------------ toggle ---------------------------------- */
+/* ------------------------------- toggle --------------------------------- */
 
 #toc-toggle {
-  display: none; position: fixed; top: 1rem; left: 1rem; z-index: 20;
-  background: var(--paper); border: 1px solid var(--rule); border-radius: 5px;
-  width: 2.4rem; height: 2.4rem; font-size: 1.1rem; cursor: pointer;
+  display: none; position: fixed; top: 0.9rem; left: 0.9rem; z-index: 20;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 6px;
+  width: 2.5rem; height: 2.5rem; font-size: 1.1rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
-@media (max-width: 1180px) {
+
+/* ============================ responsive ================================= */
+
+/* No room for the right note margin: notes + refs flow inline. */
+@media (max-width: 1280px) {
+  .unit, .paper-header { padding-right: 0; }
+  .paper { max-width: var(--measure); }
+  .unit > .fig, .unit > .tbl { margin-right: 0; }
+  .sidenote {
+    float: none; clear: none; width: auto; display: block;
+    margin: 0.7rem 0; padding: 0.55rem 0.9rem; font-size: 0.84rem;
+    background: var(--accent-soft); border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0;
+    color: #50525a;
+  }
+}
+
+/* Sidebar becomes a drawer. */
+@media (max-width: 1024px) {
   #toc-toggle { display: block; }
-  .sidebar { transform: translateX(-100%); transition: transform 0.2s; z-index: 15; }
+  .sidebar { transform: translateX(-100%); transition: transform 0.22s ease; z-index: 15; box-shadow: 2px 0 14px rgba(0,0,0,0.12); }
   body.toc-open .sidebar { transform: none; }
-  .content { margin-left: 0; padding: 4.5rem 1.3rem 6rem; }
+  .content { margin-left: 0; padding: 4.5rem clamp(1.1rem, 5vw, 3rem) 6rem; }
+}
+
+/* Stack figure captions below the image. */
+@media (max-width: 900px) {
+  .fig { display: block; }
+  .fig > .fig-items { margin-bottom: 0.5rem; }
+}
+
+/* Phone tightening. */
+@media (max-width: 640px) {
+  body { font-size: 1.08rem; line-height: 1.58; }
+  p, li { text-align: left; }            /* avoid loose justification on narrow lines */
+  .paper-title { font-size: 1.9rem; }
+  .heading.lvl-1 { font-size: 1.5rem; }
+  .heading.lvl-2 { font-size: 1.18rem; }
+  .tbl table { font-size: 0.76rem; }
 }

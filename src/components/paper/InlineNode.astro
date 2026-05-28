@@ -1,7 +1,7 @@
 ---
 import Inline from "./Inline.astro";
 import { renderMath } from "../../lib/katex";
-import { labelHref } from "../../lib/ir";
+import { labelHref, referencesByKey } from "../../lib/ir";
 import type { Inline as InlineT, Footnote } from "../../lib/ir";
 
 interface Props {
@@ -19,6 +19,7 @@ function footnoteInline(f: Footnote): InlineT[] {
   return out;
 }
 const fn = node.type === "footnoteRef" ? fnById.get(node.id) : undefined;
+const citedRefs = node.type === "citeRef" ? node.keys.map((k) => referencesByKey.get(k)).filter(Boolean) : [];
 ---
 {node.type === "text" && <Fragment>{node.value}</Fragment>}
 {node.type === "emph" && <em><Inline nodes={node.content} footnotes={footnotes} /></em>}
@@ -43,7 +44,19 @@ const fn = node.type === "footnoteRef" ? fnById.get(node.id) : undefined;
   <a href={node.href} class={node.mono ? "ext mono" : "ext"} target="_blank" rel="noopener"><Inline nodes={node.content} footnotes={footnotes} /></a>
 )}
 {node.type === "crossRef" && <a class="xref" href={labelHref(node.target)}>{node.text}</a>}
-{node.type === "citeRef" && <a class="cite" href={`/#ref-${node.keys[0]}`}>{node.text}</a>}
+{node.type === "citeRef" && (
+  <span class="cite-wrap">
+    <span class="cite">{node.text}</span>
+    <span class="sidenote cite-note">
+      {citedRefs.map((r) => (
+        <span class="ref-item">
+          <span class="ref-num">[{r!.number}]</span>
+          <Inline nodes={r!.content} />
+        </span>
+      ))}
+    </span>
+  </span>
+)}
 {node.type === "footnoteRef" && (
   <span class="fn">
     <sup class="fn-mark">{node.id}</sup>

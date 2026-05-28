@@ -22,19 +22,23 @@ const appendixEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "a
     {mainEntries.map((e) => (
       <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>
         <a href={href(e)}>
-          {e.number && <span class="toc-num">{e.number}</span>}
-          <Inline nodes={e.title} />
+          <span class="toc-num">{e.number ?? ""}</span>
+          <span class="toc-label"><Inline nodes={e.title} /></span>
         </a>
         {e.children.length > 0 && (
           <ol class="toc-sub">
             {e.children.map((c) => (
-              <li><a href={href(c)}>{c.number && <span class="toc-num">{c.number}</span>}<Inline nodes={c.title} /></a></li>
+              <li>
+                <a href={href(c)}>
+                  <span class="toc-num">{c.number ?? ""}</span>
+                  <span class="toc-label"><Inline nodes={c.title} /></span>
+                </a>
+              </li>
             ))}
           </ol>
         )}
       </li>
     ))}
-    <li class="toc-item"><a href="/#references">References</a></li>
   </ol>
   {appendixEntries.length > 0 && (
     <>
@@ -43,8 +47,8 @@ const appendixEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "a
         {appendixEntries.map((e) => (
           <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>
             <a href={href(e)}>
-              {e.number && <span class="toc-num">{e.number}</span>}
-              <Inline nodes={e.title} />
+              <span class="toc-num">{e.number ?? ""}</span>
+              <span class="toc-label"><Inline nodes={e.title} /></span>
             </a>
           </li>
         ))}

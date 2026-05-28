@@ -2,7 +2,6 @@
 import PaperLayout from "../layouts/PaperLayout.astro";
 import Blocks from "../components/paper/Blocks.astro";
 import Inline from "../components/paper/Inline.astro";
-import References from "../components/References.astro";
 import { manifest, mainUnits } from "../lib/ir";
 
 const plainTitle = manifest.title.map((n) => (n.type === "text" ? n.value : n.type === "break" ? " " : "")).join("").trim();
@@ -31,7 +30,5 @@ const units = mainUnits();
         <Blocks blocks={u.blocks} footnotes={u.footnotes} />
       </section>
     ))}
-
-    <References />
   </article>
 </PaperLayout>

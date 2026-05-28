@@ -29,6 +29,8 @@ for (const [path, mod] of Object.entries(unitModules)) {
   unitsBySlug.set(slug, mod.default);
 }
 
+export const referencesByKey = new Map(manifest.references.map((r) => [r.key, r]));
+
 export function getUnit(slug: string): Unit | undefined {
   return unitsBySlug.get(slug);
 }

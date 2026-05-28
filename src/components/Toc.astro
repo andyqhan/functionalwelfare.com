@@ -47,7 +47,7 @@ const appendixEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "a
         {appendixEntries.map((e) => (
           <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>
             <a href={href(e)}>
-              <span class="toc-num">{e.number ? `§${e.number}` : ""}</span>
+              <span class="toc-num">{e.number ?? ""}</span>
               <span class="toc-label"><Inline nodes={e.title} /></span>
             </a>
           </li>

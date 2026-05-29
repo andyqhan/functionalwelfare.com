@@ -33,7 +33,10 @@ const { title, currentSlug } = Astro.props;
     </script>
   </head>
   <body>
-    <button id="toc-toggle" aria-label="Toggle contents">☰</button>
+    <header id="mobile-header">
+      <button id="toc-toggle" aria-label="Toggle contents">☰</button>
+      <a class="mh-title" href="/">How’s it going?</a>
+    </header>
     <aside class="sidebar">
       <Toc currentSlug={currentSlug} />
     </aside>
@@ -51,6 +54,28 @@ const { title, currentSlug } = Astro.props;
     <script is:inline>
       const toggle = document.getElementById("toc-toggle");
       toggle && toggle.addEventListener("click", () => document.body.classList.toggle("toc-open"));
+
+      // Auto-hiding mobile header (visible only in the narrow/drawer layout):
+      // reveal on scroll-up or at the top, hide on scroll-down. CSS handles the
+      // slide; this just toggles body.header-hidden based on scroll direction.
+      (function () {
+        if (!document.getElementById("mobile-header")) return;
+        let lastY = window.scrollY, ticking = false;
+        const update = () => {
+          const y = window.scrollY;
+          if (Math.abs(y - lastY) > 4) {
+            if (y < 10 || y < lastY || document.body.classList.contains("toc-open"))
+              document.body.classList.remove("header-hidden");
+            else if (y > 64)
+              document.body.classList.add("header-hidden");
+            lastY = y;
+          }
+          ticking = false;
+        };
+        addEventListener("scroll", () => {
+          if (!ticking) { ticking = true; requestAnimationFrame(update); }
+        }, { passive: true });
+      })();
 
       const rez = document.querySelector(".sidebar-resizer");
       if (rez) {
@@ -73,6 +98,7 @@ const { title, currentSlug } = Astro.props;
           try {
             localStorage.setItem("fw-sidebar-w", getComputedStyle(root).getPropertyValue("--sidebar-w").trim());
           } catch (e) {}
+          requestAnimationFrame(placeCaptions); // figure heights changed with the column width
         };
         rez.addEventListener("pointerup", end);
         rez.addEventListener("pointercancel", end);
@@ -80,6 +106,50 @@ const { title, currentSlug } = Astro.props;
           root.style.removeProperty("--sidebar-w");
           try { localStorage.removeItem("fw-sidebar-w"); } catch (e) {}
         });
+      }
+
+      // In the enhanced (wide) layout, figure/table captions hang in the left
+      // gutter and a tall one overflows *downward*, where it can run into a
+      // following section heading's hanging marker (e.g. Fig 3's caption vs the
+      // §3.3 marker). For each caption that collides, slide it up just enough to
+      // clear the nearest marker — so it ends near the figure's bottom instead
+      // of starting at the top and spilling into the heading. Captions are
+      // absolutely positioned, so nudging one reflows nothing else.
+      const enhancedMQ = window.matchMedia("(min-width: 1560px)");
+      function placeCaptions() {
+        const caps = document.querySelectorAll(".fig > figcaption, .tbl > figcaption");
+        caps.forEach((c) => { c.style.top = ""; }); // reset to the CSS default (top: 0)
+        if (!enhancedMQ.matches) return;             // markers only hang at this width
+        const markers = [...document.querySelectorAll(".heading > .sec-num")].map((m) => m.getBoundingClientRect());
+        const GAP = 8; // px of breathing room between caption bottom and marker
+        caps.forEach((c) => {
+          const cr = c.getBoundingClientRect();
+          let clashTop = Infinity;
+          for (const mr of markers) {
+            const overlapsX = mr.left < cr.right && mr.right > cr.left;
+            const runsInto = mr.top > cr.top && mr.top < cr.bottom; // caption spills onto it
+            if (overlapsX && runsInto) clashTop = Math.min(clashTop, mr.top);
+          }
+          if (clashTop !== Infinity) {
+            const shift = cr.bottom + GAP - clashTop;
+            if (shift > 0) c.style.top = -Math.round(shift) + "px";
+          }
+        });
+      }
+      const schedulePlace = () => requestAnimationFrame(placeCaptions);
+      schedulePlace();
+      window.addEventListener("load", schedulePlace);
+      window.addEventListener("resize", schedulePlace);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedulePlace);
+      // Figure/table images are lazy-loaded, so a below-the-fold figure measures
+      // as zero-height until it scrolls into view — which would make the next
+      // section marker look like it sits at the figure's top and push the caption
+      // far too high. Re-place captions whenever a figure's content actually
+      // resizes (image decode, lazy load, reflow), so the nudge is measured
+      // against the real figure height and stays minimal.
+      if ("ResizeObserver" in window) {
+        const ro = new ResizeObserver(schedulePlace);
+        document.querySelectorAll(".fig > .fig-items, .tbl > .tbl-body").forEach((el) => ro.observe(el));
       }
 
       // Figure/table lightbox: click a static image to view it full screen.

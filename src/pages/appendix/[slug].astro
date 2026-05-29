@@ -2,6 +2,7 @@
 import PaperLayout from "../../layouts/PaperLayout.astro";
 import Blocks from "../../components/paper/Blocks.astro";
 import Inline from "../../components/paper/Inline.astro";
+import AppendixOverview from "../../components/paper/AppendixOverview.astro";
 import { appendixSummaries, getUnit, appendixParam, unitPath } from "../../lib/ir";
 
 export function getStaticPaths() {
@@ -24,7 +25,9 @@ const plainTitle = (summary.number ? `Appendix ${summary.number} · ` : "") + su
 <PaperLayout title={plainTitle} currentSlug={unitSlug}>
   <article class="paper appendix">
     <section class="unit" id={unit.slug} data-slug={unit.slug}>
-      <Blocks blocks={unit.blocks} footnotes={unit.footnotes} />
+      {unitSlug === "appendix-overview"
+        ? <AppendixOverview blocks={unit.blocks} />
+        : <Blocks blocks={unit.blocks} footnotes={unit.footnotes} />}
     </section>
     <nav class="appendix-nav">
       <span>{prev ? <a href={unitPath(prev.slug)}>← <Inline nodes={prev.title} /></a> : <a href="/">← Back to paper</a>}</span>

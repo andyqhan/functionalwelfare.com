@@ -1,0 +1,79 @@
+---
+import Blocks from "./Blocks.astro";
+import Inline from "./Inline.astro";
+import type { Block, Inline as InlineT } from "../../lib/ir";
+
+interface Props {
+  blocks: Block[];
+}
+const { blocks } = Astro.props;
+
+// The "Appendix overview" unit is a hand-authored three-level outline. In the
+// source the levels are drawn with LaTeX \leftskip (0 → 1.5em → 3em):
+//   bold category   →   italic subcategory   →   bold "Appendix X" entry
+// Once converted, every level becomes an indistinguishable flat paragraph (the
+// leftskip indentation has no HTML equivalent), so the hierarchy reads as a
+// wall of bold lines. We re-derive the levels here and indent them like the PDF.
+
+const heading = blocks.find(
+  (b): b is Extract<Block, { type: "heading" }> => b.type === "heading",
+);
+const paragraphs = blocks.filter(
+  (b): b is Extract<Block, { type: "paragraph" }> => b.type === "paragraph",
+);
+
+const isBlank = (n: InlineT) => n.type === "text" && n.value.trim() === "";
+const trimEdges = (nodes: InlineT[]) => {
+  let a = 0;
+  let b = nodes.length;
+  while (a < b && isBlank(nodes[a])) a++;
+  while (b > a && isBlank(nodes[b - 1])) b--;
+  return nodes.slice(a, b);
+};
+// An entry is the only level that links to an actual appendix, so a contained
+// appendix cross-reference is what distinguishes it from a bold category header.
+const linksAppendix = (nodes: InlineT[]): boolean =>
+  nodes.some(
+    (n) =>
+      (n.type === "crossRef" && n.kind === "appendix") ||
+      ("content" in n && Array.isArray((n as any).content) && linksAppendix((n as any).content)),
+  );
+
+type Level = "category" | "subcategory" | "entry";
+interface Item {
+  level: Level;
+  depth: 0 | 1 | 2;
+  content: InlineT[];
+}
+
+const items: Item[] = [];
+let inSubcategory = false;
+for (const p of paragraphs) {
+  const content = trimEdges(p.content);
+  if (content.length === 0) continue;
+  const real = content.filter((n) => !isBlank(n));
+  const only = real.length === 1 ? real[0] : null;
+  const first = real[0];
+
+  if (first && first.type === "strong" && linksAppendix(first.content)) {
+    items.push({ level: "entry", depth: inSubcategory ? 2 : 1, content });
+  } else if (only && only.type === "emph") {
+    inSubcategory = true;
+    items.push({ level: "subcategory", depth: 1, content });
+  } else if (only && only.type === "strong") {
+    inSubcategory = false; // a new category ends the previous subcategory group
+    items.push({ level: "category", depth: 0, content });
+  } else {
+    // Unexpected shape — keep it visible at the current indentation level.
+    items.push({ level: "entry", depth: inSubcategory ? 2 : 1, content });
+  }
+}
+---
+{heading && <Blocks blocks={[heading]} />}
+<div class="ao-list">
+  {items.map((it) => (
+    <p class:list={["ao-item", `ao-${it.level}`, `ao-d${it.depth}`]}>
+      <Inline nodes={it.content} />
+    </p>
+  ))}
+</div>

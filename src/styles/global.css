@@ -176,21 +176,21 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 
 /* ----------------------- header: title / abstract ----------------------- */
 /* Default (stacked): flex column. hdr-left is transparent so its children and
-   the abstract order together: title, byline, github, abstract, epigraph. */
+   the abstract order together: title, byline, arxiv, correspondence, abstract,
+   epigraph. (Wide layout uses DOM order — keep index.astro in sync.) */
 .paper-header { display: flex; flex-direction: column; }
 .hdr-left { display: contents; }
 .paper-title { order: 1; margin: 0 0 0.5rem; }
 .byline { order: 2; margin: 0 0 0.4rem; }
 .arxiv { order: 3; margin: 0 0 0.1rem; font-size: 0.85rem; }
-.repo { order: 4; margin: 0; font-size: 0.85rem; }
+.correspondence { order: 4; margin-top: 0.5rem; font-size: 0.82rem; color: var(--muted); }
 .abstract { order: 5; margin: 1.6rem 0 0; font-size: 0.97em; }
 .epigraph-wrap { order: 6; margin-top: 1.4rem; }
-.correspondence { order: 7; margin-top: 0.7rem; font-size: 0.82rem; color: var(--muted); }
 
 .authors { font-size: 1.12rem; }
 .author:not(:last-child)::after { content: ", "; }
 .affiliation { color: var(--muted); font-style: italic; }
-.arxiv a, .repo a { font-family: var(--mono); }
+.arxiv a { font-family: var(--mono); }
 .abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
 
 .epigraph { margin: 0; font-style: italic; color: #56554f; text-align: left; }
@@ -314,9 +314,40 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 
 .appendix-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.88rem; }
 
+/* -------------------- appendix overview (outline) ----------------------- */
+/* Three-level outline re-indented to mirror the source's \leftskip levels
+   (category 0 → subcategory 1.5em → entry 3em). See AppendixOverview.astro. */
+.ao-list { margin-top: 1.2rem; }
+.ao-item { margin: 0; }
+.ao-category { font-weight: 700; font-size: 1.18rem; line-height: 1.3; margin: 2rem 0 0.55rem; }
+.ao-list > .ao-category:first-child { margin-top: 0.6rem; }
+.ao-subcategory { font-style: italic; color: var(--muted); margin: 1rem 0 0.5rem; }
+.ao-entry { line-height: 1.5; margin: 0.5rem 0; }
+.ao-d1 { margin-left: 1.5rem; }
+.ao-d2 { margin-left: 3rem; }
+
 /* ------------------------------- toggle --------------------------------- */
 
-#toc-toggle { display: none; position: fixed; top: 0.9rem; left: 0.9rem; z-index: 20; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; width: 2.5rem; height: 2.5rem; font-size: 1.1rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+/* Mobile top bar: hamburger (left) + centred title. Hidden on desktop; shown in
+   the narrow/drawer layout (≤1024px), where it's fixed, opaque, and auto-hides on
+   scroll-down (body.header-hidden, toggled by the PaperLayout script). */
+#mobile-header {
+  display: none;
+  position: fixed; inset: 0 0 auto 0; z-index: 25;
+  grid-template-columns: 1fr auto 1fr; align-items: center;
+  height: 3.2rem; padding: 0 0.6rem;
+  background: var(--bg); border-bottom: 1px solid var(--rule);
+  transition: transform 0.25s ease;
+}
+body.header-hidden #mobile-header { transform: translateY(-100%); }
+.mh-title { grid-column: 2; font-family: var(--serif); font-weight: 700; font-size: 1.15rem; color: var(--ink); text-decoration: none; white-space: nowrap; }
+#toc-toggle {
+  grid-column: 1; justify-self: start;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.6rem; height: 2.6rem;
+  background: none; border: none; color: var(--ink);
+  font-size: 1.35rem; line-height: 1; cursor: pointer;
+}
 
 /* draggable sidebar width handle (tracks the resizable --sidebar-w) */
 .sidebar-resizer { position: fixed; top: 0; left: var(--sidebar-w); width: 11px; height: 100%; transform: translateX(-5px); cursor: col-resize; z-index: 30; touch-action: none; }
@@ -383,14 +414,14 @@ body.resizing { cursor: col-resize; user-select: none; }
   }
   .unit { padding-left: calc(var(--cap-margin) + var(--gap)); }
 
-  /* Top-level section headings overhang wholesale into the left gutter.
-     Overrides the lvl-1 margin shorthand. */
-  .heading.lvl-1 { margin-left: calc(-1 * (var(--cap-margin) + var(--gap))); }
-
-  /* Subheadings keep their text aligned with the body, but their section
-     marker hangs out into the left gutter (overhanging the text below). */
+  /* Section headings keep their text aligned with the body, but their section
+     marker hangs out into the left gutter (overhanging the text below). Because
+     the marker is out of flow, the lvl-1 underline starts after it, and a
+     wrapped title stays right of the marker instead of flowing beneath it. */
+  .heading.lvl-1,
   .heading.lvl-2,
   .heading.lvl-3 { position: relative; }
+  .heading.lvl-1 > .sec-num,
   .heading.lvl-2 > .sec-num,
   .heading.lvl-3 > .sec-num {
     position: absolute;
@@ -447,8 +478,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 /* Sidebar becomes a drawer. */
 @media (max-width: 1024px) {
-  #toc-toggle { display: block; }
-  .sidebar { transform: translateX(-100%); transition: transform 0.22s ease; z-index: 15; box-shadow: 2px 0 14px rgba(0,0,0,0.12); }
+  #mobile-header { display: grid; }
+  /* Drawer slides under the header (top padding clears the 3.2rem bar). */
+  .sidebar { transform: translateX(-100%); transition: transform 0.22s ease; z-index: 15; box-shadow: 2px 0 14px rgba(0,0,0,0.12); padding-top: 4rem; }
   body.toc-open .sidebar { transform: none; }
   .content { margin-left: 0; padding: 4.5rem clamp(1.1rem, 5vw, 3rem) 6rem; }
   .sidebar-resizer { display: none; }
@@ -461,7 +493,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 @media (max-width: 1559.98px) {
   .fig, .tbl { display: block; }
   .fig > .fig-items, .tbl > .tbl-body { margin-bottom: 0.5rem; }
-  .fig > figcaption, .tbl > figcaption { position: static; text-align: left; }
+  .fig > figcaption, .tbl > figcaption { position: static; width: auto; text-align: left; }
   .cap-label { text-align: left; }
 }
 

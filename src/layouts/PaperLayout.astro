@@ -2,12 +2,50 @@
 import "katex/dist/katex.min.css";
 import "../styles/global.css";
 import Toc from "../components/Toc.astro";
+import { manifest } from "../lib/ir";
 
 interface Props {
   title: string;
   currentSlug?: string;
+  /** Social-card description; defaults to the paper abstract. */
+  description?: string;
+  /** Social-card image (site-root path); defaults to the overview figure. */
+  image?: string;
+  /** Machine-readable Markdown version of this page, for rel=alternate + agents. */
+  mdHref?: string;
 }
-const { title, currentSlug } = Astro.props;
+
+// Flatten inline IR nodes to plain text (mirrors index.astro's `plain`).
+const plainInline = (nodes: any[] = []): string =>
+  nodes
+    .map((n) =>
+      n?.type === "text"
+        ? n.value
+        : n?.type === "break"
+          ? " "
+          : Array.isArray(n?.content)
+            ? plainInline(n.content)
+            : "",
+    )
+    .join("");
+
+// Default social description = the paper abstract, collapsed and clamped.
+const abstractText = (manifest.abstract ?? [])
+  .map((b: any) => plainInline(b.content))
+  .join(" ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const { title, currentSlug, description, image = "/og-image.png", mdHref = "/index.md" } = Astro.props;
+const ogTitle = title.replace(/\s+/g, " ").trim();
+// The full abstract, collapsed to one line. Platforms truncate the *display*
+// themselves (Twitter ~200 chars, Google ~155); arXiv likewise ships the whole
+// abstract in its description tags rather than pre-clamping.
+const desc = (description ?? abstractText).replace(/\s+/g, " ").trim();
+
+// Absolute URLs for social cards (Astro.site is set in astro.config).
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL(image, Astro.site).href;
 ---
 <!doctype html>
 <html lang="en">
@@ -16,6 +54,29 @@ const { title, currentSlug } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/mousebot.png" type="image/png" />
     <title>{title}</title>
+    <meta name="description" content={desc} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="text/markdown" href={mdHref} title="Markdown (for LLMs)" />
+
+    <!-- Open Graph (Slack, Facebook, LinkedIn, iMessage, Discord) -->
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="functionalwelfare.com" />
+    <meta property="og:title" content={ogTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="600" />
+    <meta
+      property="og:image:alt"
+      content="Overview: training, extracting, and evaluating the functional welfare axis."
+    />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={ogTitle} />
+    <meta name="twitter:description" content={desc} />
+    <meta name="twitter:image" content={ogImage} />
     <link rel="preload" href="/fonts/cardo-regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cardo-bold.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cardo-italic.woff2" as="font" type="font/woff2" crossorigin />

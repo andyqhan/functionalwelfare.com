@@ -1,5 +1,6 @@
 ---
 import InlineNode from "./InlineNode.astro";
+import { glueAtomicPunctuation } from "../../lib/typography";
 import type { Inline, Footnote } from "../../lib/ir";
 
 interface Props {
@@ -7,5 +8,7 @@ interface Props {
   footnotes?: Footnote[];
 }
 const { nodes, footnotes = [] } = Astro.props;
+// Keep punctuation from wrapping away from a preceding inline-math/emoji atom.
+const glued = glueAtomicPunctuation(nodes);
 ---
-{nodes.map((node) => <InlineNode node={node} footnotes={footnotes} />)}
+{glued.map((node) => <InlineNode node={node} footnotes={footnotes} />)}

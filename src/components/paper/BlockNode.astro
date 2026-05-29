@@ -5,6 +5,7 @@ import Figure from "./Figure.astro";
 import Table from "./Table.astro";
 import ModelExample from "./ModelExample.astro";
 import { renderMath } from "../../lib/katex";
+import { preventWidow, leadingQuoteClass } from "../../lib/typography";
 import type { Block, Footnote } from "../../lib/ir";
 
 interface Props {
@@ -22,7 +23,11 @@ const Heading = block.type === "heading" ? (`h${Math.min(block.level + 1, 6)}` a
   </Heading>
 )}
 
-{block.type === "paragraph" && <p><Inline nodes={block.content} footnotes={footnotes} /></p>}
+{block.type === "paragraph" && (
+  <p class:list={[leadingQuoteClass(block.content)]}>
+    <Inline nodes={preventWidow(block.content)} footnotes={footnotes} />
+  </p>
+)}
 
 {block.type === "mathBlock" && (
   <div class="math-display" id={block.id}>
@@ -45,7 +50,11 @@ const Heading = block.type === "heading" ? (`h${Math.min(block.level + 1, 6)}` a
 
 {block.type === "epigraph" && (
   <div class="epigraph">
-    {block.lines.map((line) => <div class="epigraph-line"><Inline nodes={line} footnotes={footnotes} /></div>)}
+    {block.lines.map((line, i) => (
+      <div class:list={["epigraph-line", i === 0 ? leadingQuoteClass(line) : undefined]}>
+        <Inline nodes={line} footnotes={footnotes} />
+      </div>
+    ))}
     {block.attribution && <div class="epigraph-attr"><Inline nodes={block.attribution} footnotes={footnotes} /></div>}
   </div>
 )}

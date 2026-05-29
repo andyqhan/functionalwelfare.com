@@ -1,6 +1,6 @@
 ---
 import Inline from "./Inline.astro";
-import { renderMath } from "../../lib/katex";
+import { renderMath, proseNumber } from "../../lib/katex";
 import { labelHref, referencesByKey } from "../../lib/ir";
 import type { Inline as InlineT, Footnote } from "../../lib/ir";
 
@@ -19,6 +19,7 @@ function footnoteInline(f: Footnote): InlineT[] {
   return out;
 }
 const fn = node.type === "footnoteRef" ? fnById.get(node.id) : undefined;
+const proseNum = node.type === "mathInline" ? proseNumber(node.tex) : null;
 const citedRefs = node.type === "citeRef" ? node.keys.map((k) => referencesByKey.get(k)).filter(Boolean) : [];
 ---
 {node.type === "text" && <Fragment>{node.value}</Fragment>}
@@ -31,7 +32,9 @@ const citedRefs = node.type === "citeRef" ? node.keys.map((k) => referencesByKey
 {node.type === "sup" && <sup><Inline nodes={node.content} footnotes={footnotes} /></sup>}
 {node.type === "sub" && <sub><Inline nodes={node.content} footnotes={footnotes} /></sub>}
 {node.type === "break" && <br />}
-{node.type === "mathInline" && <Fragment set:html={renderMath(node.tex, false)} />}
+{node.type === "mathInline" && (proseNum !== null
+  ? <span class="num">{proseNum}</span>
+  : <Fragment set:html={renderMath(node.tex, false)} />)}
 {node.type === "emoji" && <img class="emoji" src={node.src} alt={node.name} loading="lazy" />}
 {node.type === "inlineImage" && (
   <img class="inline-img" src={node.src} alt={node.alt ?? ""} style={node.heightEm ? `height:${node.heightEm}em` : undefined} loading="lazy" />

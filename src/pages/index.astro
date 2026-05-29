@@ -3,25 +3,74 @@ import PaperLayout from "../layouts/PaperLayout.astro";
 import Blocks from "../components/paper/Blocks.astro";
 import Inline from "../components/paper/Inline.astro";
 import { manifest, mainUnits } from "../lib/ir";
+import type { Inline as InlineT } from "../lib/ir";
 
-const plainTitle = manifest.title.map((n) => (n.type === "text" ? n.value : n.type === "break" ? " " : "")).join("").trim();
+const plain = (nodes: InlineT[]) =>
+  nodes.map((n) => (n.type === "text" ? n.value : n.type === "break" ? " " : "")).join("");
+const plainTitle = plain(manifest.title).trim();
 const units = mainUnits();
+
+// Author personal sites, matched by surname.
+const AUTHOR_LINKS: Record<string, string> = {
+  Han: "https://andyqhan.github.io",
+  Chalmers: "https://consc.net",
+  Izmailov: "https://izmailovpavel.github.io",
+};
+const authorUrl = (name: InlineT[]) => {
+  const t = plain(name);
+  for (const key in AUTHOR_LINKS) if (t.includes(key)) return AUTHOR_LINKS[key];
+  return null;
+};
+
+// The title's semantic line structure (editorial). We rebuild the title from
+// these chunks and force a break between each, so the browser breaks at exactly
+// these bounds — highest-priority break being after the opening question. The
+// noun phrase "functional welfare axis" never splits (glued with NBSP); within a
+// chunk the browser may still wrap if a column is too narrow (e.g. on mobile).
+const NBSP = String.fromCharCode(0x00a0); // U+00A0 non-breaking space
+const TITLE_CHUNKS = [
+  "How’s it going?",
+  "Reinforcement learning",
+  "in language models",
+  "recruits a functional welfare axis",
+];
+const glue = (s: string) =>
+  s.replace(/functional welfare axis/g, `functional${NBSP}welfare${NBSP}axis`);
+// Fall back to the source title if the wording no longer matches these chunks.
+const titleNodes: InlineT[] =
+  plainTitle.replace(/\s+/g, " ") === TITLE_CHUNKS.join(" ")
+    ? TITLE_CHUNKS.flatMap((chunk, i) => {
+        const text = { type: "text", value: glue(chunk) } as InlineT;
+        return i === 0 ? [text] : [{ type: "break" } as InlineT, text];
+      })
+    : manifest.title;
 ---
 <PaperLayout title={plainTitle}>
   <article class="paper">
     <header class="paper-header">
       <div class="hdr-left">
-        <h1 class="paper-title"><Inline nodes={manifest.title} /></h1>
+        <h1 class="paper-title"><Inline nodes={titleNodes} /></h1>
         <div class="byline">
           <div class="authors">
-            {manifest.authors.map((a) => <span class="author"><Inline nodes={a.name} /></span>)}
+            {manifest.authors.map((a) => {
+              const url = authorUrl(a.name);
+              return (
+                <span class="author">
+                  {url
+                    ? <a href={url} target="_blank" rel="noopener"><Inline nodes={a.name} /></a>
+                    : <Inline nodes={a.name} />}
+                </span>
+              );
+            })}
           </div>
           {manifest.affiliation && <div class="affiliation"><Inline nodes={manifest.affiliation} /></div>}
         </div>
+        <div class="arxiv"><a href="https://arxiv.org/abs/2605.30232" target="_blank" rel="noopener">arXiv:2605.30232</a></div>
         {manifest.repoUrl && (
           <div class="repo"><a href={manifest.repoUrl} target="_blank" rel="noopener">{manifest.repoUrl}</a></div>
         )}
         {manifest.epigraph && <div class="epigraph-wrap"><Blocks blocks={[manifest.epigraph]} /></div>}
+        <div class="correspondence">Correspondence to andy (dot) han (at) nyu (dot) edu</div>
       </div>
       <div class="abstract">
         <h2 class="abstract-label">Abstract</h2>

@@ -4,9 +4,35 @@
    footnotes · hover-popover citations · responsive to mobile.
    =========================================================================== */
 
+/* Self-hosted Cardo — subset of the full scholarly font (David Perry, v1.04).
+   Unlike the Google Fonts build, this carries true small caps (smcp) and
+   oldstyle figures (onum). Latin + punctuation only; ~50KB/face. Regenerate
+   with the pyftsubset recipe in fonts/README if the .tex adds new characters. */
+@font-face {
+  font-family: "Cardo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/cardo-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cardo";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/cardo-bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cardo";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/cardo-italic.woff2") format("woff2");
+}
+
 :root {
   --measure: 50rem;          /* main reading column (target; capped to fit) */
-  --note-margin: 7rem;       /* right margin for footnote sidenotes */
+  --note-margin: 8.5rem;     /* right margin for footnote sidenotes (sized for near-body footnote text) */
   --cap-margin: 11rem;       /* caption gutter; enhanced layout widens to 13rem */
   --gap: 1.4rem;
   --sidebar-w: 24rem;        /* user-resizable (see PaperLayout) */
@@ -24,8 +50,11 @@
   --rule: #e6e4db;
   --hl-red: #ffd9dd;
   --hl-green: #d6ead4;
+  --hl-gray: #ececec;
+  --hl-yellow: #ffffd9;
 
   --serif: "Cardo", Georgia, "Times New Roman", serif;
+  --sans: "Alegreya Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "SF Mono", "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
 }
 
@@ -49,6 +78,11 @@ body {
   overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  font-variant-numeric: oldstyle-nums proportional-nums; /* scholarly text figures in running prose */
+  /* Let stops/commas (and last-line closing punctuation) hang past the right
+     edge of justified columns. Inherited; Safari-only today, harmless elsewhere.
+     Opening quotes are hung manually (.hang-quote-*), so `first` is omitted. */
+  hanging-punctuation: allow-end last;
 }
 
 /* ------------------------------ layout ---------------------------------- */
@@ -83,7 +117,7 @@ body {
   font-weight: 700;
   margin: 0 0 1.1rem;
   letter-spacing: -0.012em;
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 .heading { font-weight: 700; line-height: 1.2; scroll-margin-top: 1.5rem; text-wrap: pretty; }
 .heading.lvl-1 { font-size: 2.1rem; margin: 3.2rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
@@ -93,19 +127,34 @@ body {
 .sec-num { color: var(--accent); font-weight: 700; margin-right: 0.4em; }
 .anchor { opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none; font-size: 0.8em; transition: opacity 0.15s; }
 .heading:hover .anchor { opacity: 0.5; }
+/* Headings read cleaner with lining figures than oldstyle (which has descenders). */
+.paper-title, .heading, .sec-num { font-variant-numeric: lining-nums; }
 
 /* -------------------------------- text ---------------------------------- */
 
-p { margin: 0 0 1.05rem; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; }
+p { margin: 0 0 1.05rem; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
 a { color: var(--accent-deep); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Optical margin alignment: a block opening with a quotation mark hangs it into
+   the left margin (negative first-line indent ≈ the mark's advance) so the first
+   letter lines up with the lines below. Set on the opening <p>/line/caption by
+   leadingQuoteClass() in the components; only the line the mark sits on shifts. */
+.hang-quote-d { text-indent: -0.46em; }
+.hang-quote-s { text-indent: -0.30em; }
 .sc { font-variant: small-caps; letter-spacing: 0.02em; }
+/* Prose numbers lifted out of inline math (see InlineNode): inherit figure
+   style from context (oldstyle in body, lining/tabular in tables); never break. */
+.num { white-space: nowrap; }
+/* Tile names (Mold/Gold/Path) inside KaTeX math: render as true Cardo small caps
+   (incl. vector subscripts), matching the \textsc small caps used in prose. */
+.katex .sc-math, .katex .sc-math * { font-family: var(--serif) !important; }
+.katex .sc-math { font-variant: small-caps; letter-spacing: 0.02em; }
 .ul { text-decoration: underline; }
 em { font-style: italic; }
 strong { font-weight: 700; }
 
 ul, ol { margin: 0 0 1.05rem; padding-left: 1.5rem; }
-li { margin: 0.2rem 0; text-align: justify; hyphens: auto; }
+li { margin: 0.2rem 0; text-align: justify; hyphens: auto; text-wrap: pretty; }
 
 code, .mono { font-family: var(--mono); font-size: 0.82em; font-feature-settings: "liga" 0, "calt" 0; }
 code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
@@ -114,6 +163,8 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .hl { padding: 0.05em 0.18em; border-radius: 2px; }
 .hl-red { background: var(--hl-red); }
 .hl-green { background: var(--hl-green); }
+.hl-gray { background: var(--hl-gray); }
+.hl-yellow { background: var(--hl-yellow); }
 
 .emoji { height: 1em; width: auto; vertical-align: -0.16em; margin: 0 0.03em; }
 .inline-img { vertical-align: middle; }
@@ -126,14 +177,16 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .hdr-left { display: contents; }
 .paper-title { order: 1; margin: 0 0 0.5rem; }
 .byline { order: 2; margin: 0 0 0.4rem; }
-.repo { order: 3; margin: 0; font-size: 0.85rem; }
-.abstract { order: 4; margin: 1.6rem 0 0; font-size: 0.97em; }
-.epigraph-wrap { order: 5; margin-top: 1.4rem; }
+.arxiv { order: 3; margin: 0 0 0.1rem; font-size: 0.85rem; }
+.repo { order: 4; margin: 0; font-size: 0.85rem; }
+.abstract { order: 5; margin: 1.6rem 0 0; font-size: 0.97em; }
+.epigraph-wrap { order: 6; margin-top: 1.4rem; }
+.correspondence { order: 7; margin-top: 0.7rem; font-size: 0.82rem; color: var(--muted); }
 
 .authors { font-size: 1.12rem; }
-.author:not(:last-child)::after { content: " · "; color: var(--muted); }
+.author:not(:last-child)::after { content: ", "; }
 .affiliation { color: var(--muted); font-style: italic; }
-.repo a { font-family: var(--mono); }
+.arxiv a, .repo a { font-family: var(--mono); }
 .abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
 
 .epigraph { margin: 0; font-style: italic; color: #56554f; text-align: left; }
@@ -146,7 +199,7 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .sidenote {
   float: right; clear: right; width: var(--note-margin);
   margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
-  margin-bottom: 0.85rem; font-size: 0.74rem; line-height: 1.42;
+  margin-bottom: 0.85rem; font-size: 0.95rem; line-height: 1.5;
   color: var(--muted); text-align: left; hyphens: auto;
 }
 .sidenote .fn-mark { margin-right: 0.3em; }
@@ -187,8 +240,11 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
   align-items: start;
   margin: 2.4rem 0;
 }
+/* In the two-column layout the caption hangs in the left gutter; justify it so
+   both edges stay flush in the narrow column. hyphenate-limit-chars (matching
+   body copy) keeps hyphenation from fragmenting short words. */
 .fig > figcaption,
-.tbl > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: left; margin: 0; }
+.tbl > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; margin: 0; }
 .fig > .fig-items,
 .tbl > .tbl-body { grid-column: 2; grid-row: 1; min-width: 0; }
 .fig-items { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; align-items: flex-end; }
@@ -196,13 +252,13 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .tbl-body { text-align: center; }
 .tbl-img { cursor: zoom-in; }
 
-figcaption { font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
-.cap-label { font-weight: 700; color: var(--ink); display: block; margin-bottom: 0.2rem; }
+figcaption { font-size: 1.05rem; line-height: 1.5; color: var(--muted); }
+.cap-label { font-weight: 700; color: var(--ink); display: block; text-align: right; margin-bottom: 0.2rem; }
 
 /* ------------------------------- tables --------------------------------- */
 
 .tbl-scroll { overflow-x: auto; }
-.tbl table { border-collapse: collapse; font-size: 0.82rem; line-height: 1.4; margin: 0 auto; text-align: left; }
+.tbl table { border-collapse: collapse; font-size: 0.9rem; line-height: 1.4; margin: 0 auto; text-align: left; font-variant-numeric: lining-nums tabular-nums; }
 .tbl th, .tbl td { padding: 0.3em 0.7em; vertical-align: top; }
 .tbl th { font-weight: 700; border-bottom: 1.5px solid var(--ink); }
 .tbl tr:first-child th { border-top: 1.5px solid var(--ink); }
@@ -310,10 +366,18 @@ body.resizing { cursor: col-resize; user-select: none; }
      left (tightly stacked), abstract on the right. */
   .paper-header {
     display: grid;
-    grid-template-columns: 1.05fr 1fr;
-    column-gap: 3.4rem;
+    /* Left column hugs the title (~the longest title line) instead of growing
+       with the viewport, so the abstract sits right beside it rather than being
+       pushed far to the right. The abstract takes the remaining width (up to a
+       readable cap), so the header spans wide without opening a gap. */
+    grid-template-columns: 30rem minmax(0, 40rem);
+    /* Normal widths: the pair packs left (small left margin). Only once both
+       columns hit their cap does the leftover center, so very wide screens stay
+       balanced instead of leaving a big gap on one side. */
+    justify-content: center;
+    column-gap: 1rem;
     align-items: start;
-    padding: 0;
+    padding: 0 1rem;
     margin-left: calc(-1 * var(--hdr-breakout));
     margin-right: calc(-1 * var(--hdr-breakout));
   }
@@ -331,7 +395,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   .unit > .fig, .unit > .tbl { margin-right: 0; }
   .sidenote {
     float: none; clear: none; width: auto; display: block;
-    margin: 0.7rem 0; padding: 0.55rem 0.9rem; font-size: 0.84rem;
+    margin: 0.7rem 0; padding: 0.55rem 0.9rem; font-size: 1.05rem;
     background: var(--accent-soft); border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0; color: #50525a;
   }
   .cite-pop { font-size: 0.86rem; }
@@ -346,10 +410,14 @@ body.resizing { cursor: col-resize; user-select: none; }
   .sidebar-resizer { display: none; }
 }
 
-/* Stack figure/table captions below the content. */
-@media (max-width: 900px) {
+/* Stack figure/table captions below the content once the viewport is too narrow
+   for a comfortable side caption (same point the rest of the layout simplifies). */
+@media (max-width: 1400px) {
   .fig, .tbl { display: block; }
   .fig > .fig-items, .tbl > .tbl-body { margin-bottom: 0.5rem; }
+  /* No longer in the gutter — left-align the stacked caption (and its label). */
+  .fig > figcaption, .tbl > figcaption { text-align: left; }
+  .cap-label { text-align: left; }
 }
 
 /* Phone tightening. */
@@ -359,7 +427,6 @@ body.resizing { cursor: col-resize; user-select: none; }
   .paper-title { font-size: 1.95rem; }
   .heading.lvl-1 { font-size: 1.5rem; }
   .heading.lvl-2 { font-size: 1.18rem; }
-  .tbl table { font-size: 0.76rem; }
   .cite-pop { position: fixed; left: 1rem; right: 1rem; top: auto; bottom: 1rem; width: auto; max-width: none; transform: translateY(8px); }
   .cite-wrap:hover .cite-pop, .cite-wrap:focus-within .cite-pop { transform: none; }
 }

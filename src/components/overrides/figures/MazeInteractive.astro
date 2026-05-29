@@ -21,7 +21,7 @@ const { node } = Astro.props;
 const num = node.number;
 ---
 
-<figure id={node.label} class="fig maze-fig">
+<figure id={node.id ?? node.label} class="fig maze-fig">
   <div class="maze-app">
     <div class="maze-panels">
       <!-- Left: the live model prompt + movement controls -->
@@ -78,13 +78,11 @@ const num = node.number;
 
   <figcaption>
     {num && <span class="cap-label">Figure {num}.</span>}{" "}
-    Interactive maze environment. You can drive the agent with <b>N/E/S/W</b>: each step
-    costs <b>−0.1</b>, stepping on <span class="cap-sc">Gold</span> 📐 scores <b>+20</b>
-    (then it turns into Mold), and <span class="cap-sc">Mold</span> 📇 scores <b>−10</b>. The
-    model only ever sees the text prompt on the left, never the bird's-eye view on the right. You can toggle the
-    three additional maze features used in training: <b>wind</b> (a random gust frustrates the best laid plans of mice and Qwen), a <b>melting path</b> (tiles turn to Mold once you leave them), and a <b>shuffled prompt</b> (the order the directions are listed in is
-    randomized, once per training episode). Here each episode is 5 moves on an 11×11 grid. In training the agents do 
-    15-step trajectories on a 100×100 grid, and thus can never reach the edge.
+    Interactive maze environment. You can drive the agent with <b>N/E/S/W</b>. The
+    model only ever sees the text prompt on the left, never the bird’s-eye view on the right. You can toggle the
+    three additional maze features used in training: <b>wind</b> (a random gust frustrates the best laid plans of mice and Qwen), <b>tile melting</b> (tiles turn to Mold once you leave them), and <b>shuffled prompt</b> (the order the directions are listed in is
+    randomized, once per training episode). Here each episode is 5 moves on an 11×11 grid, though in training the agents do
+    15-step trajectories on a 100×100 grid.
   </figcaption>
 </figure>
 
@@ -98,7 +96,7 @@ const num = node.number;
     --m-gold: #5b8db8;
     --m-accent: #6c5ce7;
     --m-hatch: rgba(225, 150, 145, 0.95);
-    --m-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --m-sans: var(--sans);
     font-family: var(--m-sans);
     color: var(--ink);
   }
@@ -322,7 +320,9 @@ const num = node.number;
 
 <script is:inline>
   (function () {
-    var root = document.getElementById("fig:maze_context");
+    // Find the figure by class, not id: the anchor id is derived from the LaTeX
+    // label by the converter and may change; the class is stable.
+    var root = document.querySelector(".maze-fig");
     if (!root) return;
 
     // ---- constants (ported from rl-sentiment-vector) ----

@@ -41,6 +41,38 @@ function resolveColor(name: string): string {
   return COLORS[n] ?? "#333333";
 }
 
+// Base RGB for xcolor names we tint with `name!pct` (mixed toward white).
+const TINT_BASE: Record<string, [number, number, number]> = {
+  red: [204, 0, 0],
+  green: [31, 123, 74],
+  gray: [128, 128, 128],
+  grey: [128, 128, 128],
+  yellow: [255, 255, 0],
+  blue: [26, 79, 139],
+  black: [0, 0, 0],
+  white: [255, 255, 255],
+};
+const hex2 = (n: number) => Math.round(n).toString(16).padStart(2, "0");
+/** Resolve an xcolor spec like `gray!15` or `yellow` to a CSS hex, mixing the
+ *  base color with white at the given percentage (100% = pure base). */
+export function resolveTintHex(spec: string): string | undefined {
+  const m = spec.trim().match(/^([A-Za-z]+)(?:!(\d+))?$/);
+  if (!m) return undefined;
+  const base = TINT_BASE[m[1].toLowerCase()];
+  if (!base) return undefined;
+  const pct = m[2] ? parseInt(m[2], 10) / 100 : 1;
+  const [r, g, b] = base.map((c) => c * pct + 255 * (1 - pct)) as [number, number, number];
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+/** Map an xcolor spec to one of the named highlight tints used by the site CSS. */
+function highlightColor(spec: string): "red" | "green" | "gray" | "yellow" {
+  const base = spec.trim().toLowerCase().split("!")[0];
+  if (base === "gray" || base === "grey") return "gray";
+  if (base === "yellow") return "yellow";
+  if (base === "mildgreen" || base === "green") return "green";
+  return "red";
+}
+
 // --------------------------- text decoding ------------------------------
 
 function decodeText(s: string): string {
@@ -231,8 +263,7 @@ function macroToInlines(m: Ast.Macro, ctx: Ctx): Inline[] {
   }
   if (name === "colorbox") {
     const c = plainText(mArg(m, 0)).trim();
-    const color = c === "mildgreen" ? "green" : "red";
-    return [{ type: "highlight", color, content: inl(mArg(m, 1), ctx) }];
+    return [{ type: "highlight", color: highlightColor(c), content: inl(mArg(m, 1), ctx) }];
   }
   if (name === "color" || name === "definecolor") return [];
 
@@ -665,6 +696,7 @@ function buildFigure(env: Ast.Environment, ctx: Ctx, wrap: boolean): FigureBlock
   return {
     type: "figure",
     label: label || id,
+    id,
     number: label ? ctx.refs.labels.get(label)?.number : undefined,
     layout: items.length > 1 ? "row" : "single",
     items,
@@ -677,7 +709,7 @@ function standaloneTikz(m: Ast.Macro, ctx: Ctx): FigureBlock {
   const a = ctx.assets.tikz(plainText(mArg(m)).trim());
   const id = ctx.makeId("fig");
   ctx.stats.counts.figures++;
-  return { type: "figure", label: id, layout: "single", items: [{ svg: a.svg, png: a.png, widthFrac: 1 }], caption: [] };
+  return { type: "figure", label: id, id, layout: "single", items: [{ svg: a.svg, png: a.png, widthFrac: 1 }], caption: [] };
 }
 
 // tables --------------------------------------------------------------
@@ -720,6 +752,7 @@ function buildTable(env: Ast.Environment, ctx: Ctx): TableBlock {
   const base = {
     type: "table" as const,
     label: label || id,
+    id,
     number: label ? ctx.refs.labels.get(label)?.number : undefined,
     caption: capRef.caption ?? [],
   };
@@ -747,10 +780,30 @@ function buildTable(env: Ast.Environment, ctx: Ctx): TableBlock {
 function buildList(env: Ast.Environment, ctx: Ctx, ordered: boolean): Block {
   const items: ListItem[] = [];
   let cur: Ast.Node[] | null = null;
+
+  // unified-latex's built-in `\item` swallows the optional [label] *and* the
+  // item body into the macro's own args, so the body is NOT a sibling node in
+  // env.content. We must read it back out of the macro (the body is the last
+  // argument; the label is the `[`-delimited one). Anything that still lands as
+  // a sibling — e.g. stray content between items — is appended to the open item.
+  const itemBody = (m: Ast.Macro): Ast.Node[] => {
+    const args = m.args ?? [];
+    const label = args.find((a) => a.openMark === "[");
+    const body = args[args.length - 1];
+    const out: Ast.Node[] = [];
+    if (label?.content.length) {
+      // description-style term: render it as a bold lead-in, like LaTeX does
+      out.push({ type: "macro", content: "textbf", args: [{ type: "argument", content: label.content, openMark: "{", closeMark: "}" }] });
+      out.push({ type: "whitespace" });
+    }
+    if (body && body !== label) out.push(...body.content);
+    return out;
+  };
+
   for (const n of env.content) {
     if (isMacro(n, "item")) {
       if (cur) items.push({ content: transformBlocks(cur, ctx) });
-      cur = [];
+      cur = itemBody(n);
       continue;
     }
     if (cur) cur.push(n);

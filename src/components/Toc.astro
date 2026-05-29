@@ -11,13 +11,14 @@ const { currentSlug } = Astro.props;
 const kindBySlug = new Map(manifest.units.map((u) => [u.slug, u.kind]));
 function href(entry: TocEntry): string {
   const base = unitPath(entry.slug);
-  return `${base === "/" ? "" : base}#${entry.id}`;
+  // Always absolute, so links work from appendix pages too (not just the home page).
+  return `${base === "/" ? "/" : base}#${entry.id}`;
 }
 const mainEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "main");
 const appendixEntries = manifest.toc.filter((e) => kindBySlug.get(e.slug) === "appendix");
 ---
 <nav class="toc" aria-label="Table of contents">
-  <a class="toc-title" href="/">How's it going?</a>
+  <a class="toc-title" href="/">How’s it going?</a>
   <ol class="toc-list">
     {mainEntries.map((e) => (
       <li class={`toc-item ${e.slug === currentSlug ? "current" : ""}`}>

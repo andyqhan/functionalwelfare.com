@@ -1,6 +1,7 @@
 ---
 import Inline from "./Inline.astro";
 import { figureOverrides } from "../overrides/figures";
+import { preventWidow } from "../../lib/typography";
 import type { FigureBlock, Footnote } from "../../lib/ir";
 
 interface Props {
@@ -13,7 +14,7 @@ const Override = figureOverrides[node.label];
 {Override ? (
   <Override node={node} footnotes={footnotes} />
 ) : (
-  <figure id={node.label} class={`fig fig-${node.layout}`}>
+  <figure id={node.id ?? node.label} class={`fig fig-${node.layout}`}>
     <div class="fig-items">
       {node.items.map((item) => (
         <img
@@ -27,7 +28,7 @@ const Override = figureOverrides[node.label];
     {(node.caption.length > 0 || node.number) && (
       <figcaption>
         {node.number && <span class="cap-label">Figure {node.number}.</span>}{" "}
-        <Inline nodes={node.caption} footnotes={footnotes} />
+        <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
       </figcaption>
     )}
   </figure>

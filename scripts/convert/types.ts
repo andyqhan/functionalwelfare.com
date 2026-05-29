@@ -97,7 +97,7 @@ export interface InlineImage {
 }
 export interface HighlightNode {
   type: "highlight";
-  color: "red" | "green";
+  color: "red" | "green" | "gray" | "yellow";
   content: Inline[];
 }
 export interface ColoredLabel {
@@ -207,6 +207,8 @@ export interface FigureItem {
 export interface FigureBlock {
   type: "figure";
   label: string; // override-registry key
+  /** DOM anchor id (matches labelIndex, so cross-ref links resolve). */
+  id?: string;
   number?: string;
   layout: "single" | "row";
   items: FigureItem[];
@@ -229,6 +231,8 @@ export type TableRow = TableCell[];
 export interface TableBlock {
   type: "table";
   label: string; // override-registry key
+  /** DOM anchor id (matches labelIndex, so cross-ref links resolve). */
+  id?: string;
   number?: string;
   caption: Inline[];
   /** "data" → structured rows render as an HTML <table>; "image" → asImage SVG. */

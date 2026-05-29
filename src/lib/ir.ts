@@ -61,5 +61,6 @@ export function labelHref(label: string): string {
   const entry = manifest.labelIndex[label];
   if (!entry) return "#";
   const base = unitPath(entry.slug);
-  return `${base === "/" ? "" : base}#${entry.id}`;
+  // Always absolute, so a ref to a main-text figure resolves from appendix pages too.
+  return `${base === "/" ? "/" : base}#${entry.id}`;
 }

@@ -1,6 +1,7 @@
 ---
 import Inline from "./Inline.astro";
 import { tableOverrides } from "../overrides/tables";
+import { preventWidow } from "../../lib/typography";
 import type { TableBlock, Footnote } from "../../lib/ir";
 
 interface Props {
@@ -14,7 +15,7 @@ const rows = node.rows ?? [];
 {Override ? (
   <Override node={node} footnotes={footnotes} />
 ) : (
-  <figure id={node.label} class="tbl">
+  <figure id={node.id ?? node.label} class="tbl">
     <div class="tbl-body">
       {node.kind === "image" ? (
         <img class="tbl-img" src={node.asImage?.svg ?? node.asImage?.png} alt={node.number ? `Table ${node.number}` : "table"} loading="lazy" />
@@ -46,7 +47,7 @@ const rows = node.rows ?? [];
     {(node.caption.length > 0 || node.number) && (
       <figcaption>
         {node.number && <span class="cap-label">Table {node.number}.</span>}{" "}
-        <Inline nodes={node.caption} footnotes={footnotes} />
+        <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
       </figcaption>
     )}
   </figure>

@@ -120,7 +120,7 @@ body {
   letter-spacing: -0.012em;
   text-wrap: pretty;
 }
-.heading { font-weight: 700; line-height: 1.2; scroll-margin-top: 1.5rem; text-wrap: pretty; }
+.heading { font-weight: 700; line-height: 1.2; scroll-margin-top: 1.5rem; text-wrap: balance; }
 .heading.lvl-1 { font-size: 2.1rem; margin: 3.2rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
 .heading.lvl-2 { font-size: 1.58rem; margin: 2.2rem 0 0.6rem; }
 .heading.lvl-3 { font-size: 1.34rem; margin: 1.7rem 0 0.5rem; }
@@ -134,15 +134,34 @@ body {
 /* -------------------------------- text ---------------------------------- */
 
 p { margin: 0 0 1.05rem; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; }
+/* Cap hyphenation ladders (no more than two hyphenated lines in a row) and give
+   justification a ragged-tolerance zone so it breaks fewer words. */
+p, li, figcaption { -webkit-hyphenate-limit-lines: 2; hyphenate-limit-lines: 2; -webkit-hyphenate-limit-zone: 8%; hyphenate-limit-zone: 8%; }
 a { color: var(--accent-deep); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Underlines (links on hover, .ul) sit a touch lower and thinner than the UA default. */
+a:hover, .ul { text-underline-offset: 0.14em; text-decoration-thickness: 0.06em; }
+::selection { background: #d8e6f3; }
 /* Optical margin alignment: a block opening with a quotation mark hangs it into
    the left margin (negative first-line indent ≈ the mark's advance) so the first
    letter lines up with the lines below. Set on the opening <p>/line/caption by
    leadingQuoteClass() in the components; only the line the mark sits on shifts. */
 .hang-quote-d { text-indent: -0.46em; }
 .hang-quote-s { text-indent: -0.30em; }
-.sc { font-variant: small-caps; letter-spacing: 0.02em; }
+.sc { font-variant: small-caps; letter-spacing: 0.035em; }
+/* Acronyms (auto-wrapped by acronymHtml) as small caps. Cardo has smcp but not
+   c2sc, so we lower-case the all-caps run in CSS and let smcp render it — the DOM
+   text stays upper-case for copy/paste. Digits/hyphens (e.g. GPT-4) are untouched. */
+.ca { font-variant: small-caps; text-transform: lowercase; letter-spacing: 0.04em; }
+/* Only the regular Cardo face carries smcp; bold and italic have no OpenType
+   features at all. So keep TRUE small caps in emphasis by dropping to the regular
+   face (the small sacrifice: small-caps emphasis is upright + regular weight). */
+strong .sc, em .sc, strong .ca, em .ca { font-weight: 400; font-style: normal; }
+.heading .sc, .paper-title .sc { font-weight: 400; font-style: normal; }
+/* In headings, leave auto-detected acronyms as full-size caps: regular-weight
+   small caps would look out of place mid-heading, and the bold face can't set
+   them properly anyway. (Author \textsc small caps above are still honoured.) */
+.heading .ca, .paper-title .ca { font-variant: normal; text-transform: none; letter-spacing: 0; }
 /* Prose numbers lifted out of inline math (see InlineNode): inherit figure
    style from context (oldstyle in body, oldstyle/tabular in tables); never break. */
 .num { white-space: nowrap; }
@@ -155,7 +174,11 @@ em { font-style: italic; }
 strong { font-weight: 700; }
 
 ul, ol { margin: 0 0 1.05rem; padding-left: 1.5rem; }
-li { margin: 0.2rem 0; text-align: justify; hyphens: auto; text-wrap: pretty; }
+/* Left-aligned (not justified): short list lines justify into ugly word-gaps. */
+li { margin: 0.2rem 0; text-align: left; hyphens: auto; text-wrap: pretty; }
+li::marker { color: var(--accent); }
+/* Ordered-list numbers in lining figures (oldstyle 3/4/7/9 dangle in the marker). */
+ol > li::marker { font-variant-numeric: lining-nums tabular-nums; }
 
 code, .mono { font-family: var(--mono); font-size: 0.82em; font-feature-settings: "liga" 0, "calt" 0; }
 code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
@@ -191,15 +214,37 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .author:not(:last-child)::after { content: ", "; }
 .affiliation { color: var(--muted); }
 .arxiv a { font-family: var(--mono); }
-.abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
+/* Small caps (regular weight = true smcp) rather than bold ALL-CAPS tracking. */
+.abstract-label { font-size: 0.92rem; font-weight: 400; text-transform: lowercase; font-variant: small-caps; letter-spacing: 0.07em; color: var(--accent); margin: 0 0 0.4rem; }
 
 .epigraph { margin: 0; font-style: italic; color: #56554f; text-align: left; }
 .epigraph-line { line-height: 1.5; }
 .epigraph-attr { margin-top: 0.4rem; font-size: 0.85em; }
 
+/* ---------------------- copy-for-LLM controls --------------------------- */
+/* Two inline links (body, body+appendices) that fetch the static .md/.txt and
+   copy it to the clipboard. In the stacked header layout, order:4 places this
+   just after .correspondence; in the wide layout DOM order does. */
+.copy-md { order: 4; display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 0.6rem; font-family: var(--sans); }
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 0.4em;
+  margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 0.82rem; color: var(--muted);
+  transition: color 0.13s ease;
+}
+.copy-btn:hover, .copy-btn:focus-visible { color: var(--accent); }
+.copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.copy-btn.copied { color: var(--accent-deep); }
+.copy-ic { width: 1em; height: 1em; flex: none; }
+/* On appendix pages the controls head the article rather than the header. */
+.paper.appendix .copy-md { margin: 0 0 1.6rem; }
+
 /* --------------------------- footnote sidenotes ------------------------- */
 
-.fn-mark { color: var(--accent); font-weight: 700; font-size: 0.7em; }
+/* Real superscript figures: the marker is rendered with the literal Unicode
+   superior glyphs (¹²³…, see toSuperscript), which are pre-sized and pre-raised.
+   So neutralise the <sup> UA scale/shift and let the glyph place itself. */
+.fn-mark { color: var(--accent); vertical-align: baseline; font-size: 100%; }
 .sidenote {
   float: right; clear: right; width: var(--note-margin);
   margin-right: calc(-1 * (var(--note-margin) + var(--gap)));
@@ -289,12 +334,13 @@ figcaption { font-size: 0.9rem; line-height: 1.5; color: var(--muted); } /* matc
 
 .callout { margin: 1.5rem 0; padding: 0.85rem 1.15rem; background: var(--accent-soft); border-radius: 5px; font-size: 0.95em; }
 .verbatim { font-family: var(--mono); font-size: 0.78rem; line-height: 1.5; background: #f6f6f2; border: 1px solid var(--rule); border-left: 3px solid var(--accent); padding: 0.85rem 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 0 4px 4px 0; font-feature-settings: "liga" 0, "calt" 0; }
-blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(--rule); color: #4a4943; font-style: italic; }
+/* Extended quotations read better upright than italic (italic is for emphasis). */
+blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(--rule); color: #4a4943; font-size: 0.96em; }
 
 /* -------------------------------- math ---------------------------------- */
 
 .math-display { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.4rem 0; overflow-x: auto; }
-.math-display .eq-num { color: var(--muted); font-size: 0.9rem; }
+.math-display .eq-num { color: var(--muted); font-size: 0.9rem; font-variant-numeric: lining-nums tabular-nums; }
 .katex { font-size: 1.04em; }
 
 /* --------------------------------- TOC ---------------------------------- */
@@ -307,10 +353,10 @@ blockquote { margin: 1.2rem 0; padding-left: 1.1rem; border-left: 3px solid var(
 .toc-item > a { display: grid; grid-template-columns: 2.4em 1fr; column-gap: 0.2em; align-items: baseline; padding: 0.2rem 0; color: #45443f; }
 .toc-item.current > a { color: var(--accent-deep); font-weight: 700; }
 .toc-item > a:hover { color: var(--accent-deep); text-decoration: none; }
-.toc-num { color: var(--accent); font-weight: 700; }
+.toc-num { color: var(--accent); font-weight: 700; font-variant-numeric: lining-nums tabular-nums; }
 .toc-sub { list-style: none; margin: 0 0 0.35rem; padding-left: 2.4em; }
 .toc-sub a { display: grid; grid-template-columns: 3.1em 1fr; column-gap: 0.2em; align-items: baseline; padding: 0.12rem 0; color: var(--muted); font-size: 0.95em; }
-.toc-divider { margin: 1.3rem 0 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; }
+.toc-divider { margin: 1.3rem 0 0.5rem; font-size: 0.84rem; text-transform: lowercase; font-variant: small-caps; letter-spacing: 0.07em; color: var(--accent); font-weight: 400; }
 
 .appendix-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.88rem; }
 
@@ -468,12 +514,28 @@ body.resizing { cursor: col-resize; user-select: none; }
   .unit, .paper-header { padding-right: 0; }
   .paper { max-width: var(--measure); }
   .unit > .fig, .unit > .tbl { margin-right: 0; }
-  .sidenote {
-    float: none; clear: none; width: auto; display: block;
-    margin: 0.7rem 0; padding: 0.55rem 0.9rem; font-size: 1.05rem;
-    background: var(--accent-soft); border-left: 2px solid var(--accent); border-radius: 0 4px 4px 0; color: #50525a;
+
+  /* No room for a margin: tap the mark to reveal the note. Both footnotes and
+     citations show as a centered card pinned to the bottom of the viewport, so
+     they're never clipped by the screen edge no matter where the mark falls. */
+  .fn-mark[role="button"] { cursor: pointer; }
+  .fn-mark[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  .sidenote, .cite-pop {
+    position: fixed; left: 50%; right: auto; top: auto; bottom: 1.25rem; z-index: 60;
+    width: max-content; max-width: min(30rem, calc(100vw - 2rem));
+    margin: 0; padding: 0.7rem 0.85rem;
+    background: var(--paper); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 7px;
+    box-shadow: 0 10px 34px rgba(30, 45, 70, 0.2);
+    font-size: 0.86rem; line-height: 1.42; text-align: left; hyphens: auto;
+    opacity: 0; visibility: hidden; transform: translateX(-50%) translateY(8px);
+    transition: opacity 0.13s ease, transform 0.13s ease; pointer-events: none;
   }
-  .cite-pop { font-size: 0.86rem; }
+  .sidenote { float: none; clear: none; display: block; }
+  .fn:hover .sidenote, .fn:focus-within .sidenote,
+  .cite-wrap:hover .cite-pop, .cite-wrap:focus-within .cite-pop {
+    opacity: 1; visibility: visible; transform: translateX(-50%); pointer-events: auto;
+  }
 }
 
 /* Sidebar becomes a drawer. */
@@ -504,6 +566,4 @@ body.resizing { cursor: col-resize; user-select: none; }
   .paper-title { font-size: 1.95rem; }
   .heading.lvl-1 { font-size: 1.5rem; }
   .heading.lvl-2 { font-size: 1.18rem; }
-  .cite-pop { position: fixed; left: 1rem; right: 1rem; top: auto; bottom: 1rem; width: auto; max-width: none; transform: translateY(8px); }
-  .cite-wrap:hover .cite-pop, .cite-wrap:focus-within .cite-pop { transform: none; }
 }

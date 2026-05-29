@@ -13,3 +13,6 @@ public/paper/
 # os / editor
 .DS_Store
 *.log
+
+# playwright mcp debugging artifacts
+.playwright-mcp/

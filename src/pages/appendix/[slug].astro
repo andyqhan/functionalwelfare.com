@@ -3,6 +3,7 @@ import PaperLayout from "../../layouts/PaperLayout.astro";
 import Blocks from "../../components/paper/Blocks.astro";
 import Inline from "../../components/paper/Inline.astro";
 import AppendixOverview from "../../components/paper/AppendixOverview.astro";
+import CopyMarkdown from "../../components/CopyMarkdown.astro";
 import { appendixSummaries, getUnit, appendixParam, unitPath } from "../../lib/ir";
 
 export function getStaticPaths() {
@@ -22,8 +23,9 @@ const next = idx < summaries.length - 1 ? summaries[idx + 1] : null;
 const summary = summaries[idx];
 const plainTitle = (summary.number ? `Appendix ${summary.number} · ` : "") + summary.title.map((n) => (n.type === "text" ? n.value : "")).join("");
 ---
-<PaperLayout title={plainTitle} currentSlug={unitSlug}>
+<PaperLayout title={plainTitle} currentSlug={unitSlug} mdHref={`/appendix/${appendixParam(unitSlug)}.md`}>
   <article class="paper appendix">
+    <CopyMarkdown />
     <section class="unit" id={unit.slug} data-slug={unit.slug}>
       {unitSlug === "appendix-overview"
         ? <AppendixOverview blocks={unit.blocks} />

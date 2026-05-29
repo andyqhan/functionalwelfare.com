@@ -88,3 +88,75 @@ export function leadingQuoteClass(nodes: Inline[]): string | undefined {
   if (OPEN_SINGLE.has(ch)) return "hang-quote-s";
   return undefined;
 }
+
+// Acronyms in small caps. Strings of full-height capitals shout in running prose
+// and pock the grey of the column; setting them as small caps is the classic
+// book/journal treatment (NASA, FBI, &c.). We wrap each one in <span class="ca">
+// and let CSS lower-case-then-smcp it (Cardo has smcp but not c2sc), so the DOM
+// text stays upper-case for copy/paste and screen readers.
+//
+// This is an explicit ALLOWLIST, not a "2+ capitals" regex, on purpose: the paper
+// quotes model outputs that shout in all-caps ("…MY FINGERS ARE POSSESSED") and
+// cites URL/rec codes (CHAWWT, LILI) — a blanket rule would small-cap those too,
+// neutering the author's emphasis. To extend it after the .tex changes, scan the
+// generated IR for capital runs and add the genuine acronyms:
+//   grep -rho '"value":"[^"]*"' src/generated | grep -oE '\b[A-Z]{2,}\b' | sort | uniq -c | sort -rn
+const ACRONYMS = new Set([
+  "AAAI", "ACL", "AI", "API", "AUROC", "BSD", "CAD", "CC", "CI", "EACL",
+  "FFT", "GOLD", "GPT", "GPU", "GRPO", "GSM8K", "HPC", "ID", "IMDB", "KL",
+  "LIMA", "LLM", "LR", "MIT", "MMLU", "MOLD", "NYU", "OLS", "OSS", "PATH",
+  "PC1", "PC2", "PCA", "PEFT", "PPO", "REINFORCE", "RL", "RLHF", "SFT", "SVD",
+  "URL", "USA", "VAA",
+]);
+// Tokens that read as an English word on their own but are an acronym inside a
+// fixed name — small-capped only in that context. "OR" is the conjunction in
+// isolation, but the over-refusal benchmark OR-Bench; we shrink the OR, not Bench.
+const CONTEXTUAL: { tok: string; after: RegExp }[] = [
+  { tok: "OR", after: /^-[Bb]ench\b/ },
+];
+const isContextual = (tok: string, rest: string): boolean =>
+  CONTEXTUAL.some((c) => c.tok === tok && c.after.test(rest));
+// A capital/digit run, optionally pluralised (URLs, GPUs). Digits are allowed
+// inside so names like GSM8K match as one token; pure-number and model-size runs
+// (15, 4B, H200…) become candidates too but are dropped by the allowlist. \b
+// before the first character leaves CamelCase ("iOS", "Qwen3") alone.
+const CAP_RUN = /\b[A-Z0-9]{2,}s?\b/g;
+const isAcronym = (tok: string): boolean =>
+  ACRONYMS.has(tok) || (tok.endsWith("s") && ACRONYMS.has(tok.slice(0, -1)));
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Real superscript figures for footnote markers. Cardo carries true superior
+// glyphs (¹²³…), but its `sups` OpenType feature can't be triggered for a bare
+// digit run in the browser (the font has no DFLT script, so digit-only spans —
+// "Common" script — never reach the latn-only feature). Mapping to the literal
+// Unicode superscript characters sidesteps shaping entirely and renders the same
+// designed glyphs in every browser. Non-digits (rare) are left untouched.
+const SUPERSCRIPT: Record<string, string> = {
+  "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+  "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
+};
+export function toSuperscript(s: string): string {
+  return s.replace(/[0-9]/g, (d) => SUPERSCRIPT[d]);
+}
+
+// HTML for a decoded text run, with allowlisted acronyms wrapped for small-caps.
+// Used via set:html in InlineNode (text branch only — never code/tokens/math).
+// Returns fully escaped HTML.
+export function acronymHtml(value: string): string {
+  if (!/[A-Z]{2,}/.test(value)) return escapeHtml(value); // common case: no candidates
+  let out = "";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  CAP_RUN.lastIndex = 0;
+  while ((m = CAP_RUN.exec(value)) !== null) {
+    if (!isAcronym(m[0]) && !isContextual(m[0], value.slice(m.index + m[0].length))) continue;
+    out += escapeHtml(value.slice(last, m.index));
+    out += `<span class="ca">${escapeHtml(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  out += escapeHtml(value.slice(last));
+  return out;
+}

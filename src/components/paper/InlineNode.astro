@@ -1,6 +1,7 @@
 ---
 import Inline from "./Inline.astro";
 import { renderMath, proseNumber } from "../../lib/katex";
+import { acronymHtml, toSuperscript } from "../../lib/typography";
 import { labelHref, referencesByKey } from "../../lib/ir";
 import type { Inline as InlineT, Footnote } from "../../lib/ir";
 
@@ -22,7 +23,7 @@ const fn = node.type === "footnoteRef" ? fnById.get(node.id) : undefined;
 const proseNum = node.type === "mathInline" ? proseNumber(node.tex) : null;
 const citedRefs = node.type === "citeRef" ? node.keys.map((k) => referencesByKey.get(k)).filter(Boolean) : [];
 ---
-{node.type === "text" && <Fragment>{node.value}</Fragment>}
+{node.type === "text" && <Fragment set:html={acronymHtml(node.value)} />}
 {node.type === "emph" && <em><Inline nodes={node.content} footnotes={footnotes} /></em>}
 {node.type === "strong" && <strong><Inline nodes={node.content} footnotes={footnotes} /></strong>}
 {node.type === "smallcaps" && <span class="sc"><Inline nodes={node.content} footnotes={footnotes} /></span>}
@@ -62,10 +63,10 @@ const citedRefs = node.type === "citeRef" ? node.keys.map((k) => referencesByKey
 )}
 {node.type === "footnoteRef" && (
   <span class="fn">
-    <sup class="fn-mark">{node.id}</sup>
+    <sup class="fn-mark" tabindex="0" role="button" aria-label={`Footnote ${node.id}`}>{toSuperscript(String(node.id))}</sup>
     {fn && (
-      <span class="sidenote">
-        <sup class="fn-mark">{node.id}</sup>
+      <span class="sidenote" role="tooltip">
+        <sup class="fn-mark">{toSuperscript(String(node.id))}</sup>
         <Inline nodes={footnoteInline(fn)} footnotes={footnotes} />
       </span>
     )}

@@ -58,12 +58,34 @@ Key mechanics:
   page per appendix (`getStaticPaths` from `appendixSummaries()`).
 - **Rendering is recursive dispatch on IR node `type`:** `Blocks.astro` → `BlockNode.astro`
   (switches on block type) and `Inline.astro` → `InlineNode.astro`. Add a new IR node type ⇒ add a
-  branch in the matching dispatcher. `Figure`/`Table`/`ModelExample` are the non-trivial block
-  renderers.
+  branch in the matching dispatcher *and* in the Markdown renderer (`lib/markdown.ts`, below).
+  `Figure`/`Table`/`ModelExample` are the non-trivial block renderers.
 - `lib/ir.ts` loads the generated manifest + units and provides URL helpers (`labelHref`,
   `unitPath`, `mainUnits`, `appendixUnits`).
 - `PaperLayout.astro` is the shell (fonts, KaTeX CSS, sticky resizable TOC sidebar). `styles/global.css`
   holds the design (Cardo typography, constrained measure, margin sidenotes, theme).
+
+### Markdown output for LLM agents (`src/lib/markdown.ts`)
+
+A second renderer of the *same* IR — to Markdown instead of HTML — feeds a set of static text
+endpoints and the "Copy for LLM" buttons in the header. The endpoints are Astro static file
+endpoints (`export function GET`), prerendered to literal files at build:
+
+- `pages/index.md.ts` → `/index.md` — body: title, abstract, main sections, references (no appendices)
+- `pages/appendix/[slug].md.ts` → `/appendix/<x>.md` — one per appendix
+- `pages/llms-full.txt.ts` → `/llms-full.txt` — the whole paper (body + all appendices) in one file
+- `pages/llms.txt.ts` → `/llms.txt` — curated index (title, summary, links), per llmstxt.org
+
+`markdown.ts` mirrors the `BlockNode`/`InlineNode` dispatch, so a new IR node type needs a branch
+here too. Two sync points with the rest of the site:
+- Its `MD_MACROS` table mirrors `katex.ts`'s `MACROS`, but as plain LaTeX (no `\htmlClass` /
+  `\includegraphics`), so custom math macros don't leak as undefined into raw `.md`. Keep in sync.
+- Emoji `name`s are usually hex-codepoint sequences (e.g. `1f385-1f3fe`), decoded to glyphs; a few
+  CLDR short names are mapped explicitly in `EMOJI`.
+
+The buttons live in `components/CopyMarkdown.astro` (fetch the static file → clipboard); each page
+also advertises its `.md` via `<link rel="alternate" type="text/markdown">`. This is pure site-side
+rendering of already-generated IR — no converter changes, no `pnpm convert`.
 
 ### Two things that commonly need editing together with the source
 

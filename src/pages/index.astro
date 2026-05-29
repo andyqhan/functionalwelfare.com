@@ -2,6 +2,7 @@
 import PaperLayout from "../layouts/PaperLayout.astro";
 import Blocks from "../components/paper/Blocks.astro";
 import Inline from "../components/paper/Inline.astro";
+import CopyMarkdown from "../components/CopyMarkdown.astro";
 import { manifest, mainUnits } from "../lib/ir";
 import type { Inline as InlineT } from "../lib/ir";
 
@@ -66,6 +67,7 @@ const titleNodes: InlineT[] =
         </div>
         <div class="arxiv"><a href="https://arxiv.org/abs/2605.30232" target="_blank" rel="noopener">arXiv:2605.30232</a></div>
         <div class="correspondence">Correspondence to andy (dot) han (at) nyu (dot) edu</div>
+        <CopyMarkdown />
         {manifest.epigraph && <div class="epigraph-wrap"><Blocks blocks={[manifest.epigraph]} /></div>}
       </div>
       <div class="abstract">

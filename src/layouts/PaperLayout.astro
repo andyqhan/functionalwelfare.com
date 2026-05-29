@@ -101,6 +101,26 @@ const ogImage = new URL(image, Astro.site).href;
     <aside class="sidebar">
       <Toc currentSlug={currentSlug} />
     </aside>
+    <script is:inline>
+      // Each appendix is its own page, so following a sidebar link is a full
+      // navigation that would otherwise reset the sidebar to the top. Persist
+      // the sidebar scroll and restore it synchronously here — right after the
+      // element is parsed, before first paint — so the position is maintained
+      // with no visible jump.
+      (function () {
+        var el = document.querySelector(".sidebar");
+        if (!el) return;
+        try {
+          var y = sessionStorage.getItem("fw-sidebar-scroll");
+          if (y) el.scrollTop = parseFloat(y);
+        } catch (e) {}
+        var save = function () {
+          try { sessionStorage.setItem("fw-sidebar-scroll", String(el.scrollTop)); } catch (e) {}
+        };
+        el.addEventListener("scroll", save, { passive: true });
+        window.addEventListener("pagehide", save);
+      })();
+    </script>
     <div class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" title="Drag to resize · double-click to reset"></div>
     <main class="content">
       <slot />
@@ -159,7 +179,7 @@ const ogImage = new URL(image, Astro.site).href;
           try {
             localStorage.setItem("fw-sidebar-w", getComputedStyle(root).getPropertyValue("--sidebar-w").trim());
           } catch (e) {}
-          requestAnimationFrame(placeCaptions); // figure heights changed with the column width
+          requestAnimationFrame(() => { placeCaptions(); padTrailingCaption(); }); // figure heights changed with the column width
         };
         rez.addEventListener("pointerup", end);
         rez.addEventListener("pointercancel", end);
@@ -197,7 +217,27 @@ const ogImage = new URL(image, Astro.site).href;
           }
         });
       }
-      const schedulePlace = () => requestAnimationFrame(placeCaptions);
+
+      // At the end of an appendix the last figure/table has nothing below it but
+      // the prev/next footer. Its caption is absolutely placed (out of the box's
+      // height), so a tall one overflows past the image and would land on top of
+      // that footer — which is positioned by the image height, not the caption.
+      // Reserve bottom space on the float equal to the caption's overhang so the
+      // footer clears it. Only the enhanced layout hangs the caption out of flow
+      // (narrower widths stack it below, in document flow), and only appendix
+      // pages carry the footer — so this is a no-op everywhere else.
+      function padTrailingCaption() {
+        const last = [...document.querySelectorAll(".unit > .fig, .unit > .tbl")].pop();
+        if (!last) return;
+        last.style.marginBottom = ""; // reset before measuring (e.g. on shrink / image load)
+        if (!document.querySelector(".appendix-nav") || !enhancedMQ.matches) return;
+        const cap = last.querySelector(":scope > figcaption");
+        if (!cap) return;
+        const GAP = 24; // breathing room between the caption and the footer rule
+        const overhang = cap.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+        if (overhang > 0) last.style.marginBottom = Math.ceil(overhang + GAP) + "px";
+      }
+      const schedulePlace = () => requestAnimationFrame(() => { placeCaptions(); padTrailingCaption(); });
       schedulePlace();
       window.addEventListener("load", schedulePlace);
       window.addEventListener("resize", schedulePlace);

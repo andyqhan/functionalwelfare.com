@@ -486,6 +486,19 @@ body.resizing { cursor: col-resize; user-select: none; }
     column-gap: var(--gap);
   }
 
+  /* Table 26's "Dataset" column is descriptive prose that wraps. With the caption
+     in the grid gutter the table column is narrow enough to force wrapping, and a
+     Chromium table-sizing quirk then measures the wrapped height wrong, leaving a
+     stray vertical scrollbar in the scroll box. Stack this one table's caption
+     below (as the narrow layout does for all tables) and drop the scroll box, so
+     it lays out in normal flow — measured correctly, never scrolling. The
+     negative margin-left above still lets it span the full gutter+text width. */
+  #tab-steering-rollouts { display: block; }
+  #tab-steering-rollouts > .tbl-body { margin-bottom: 0.6rem; }
+  #tab-steering-rollouts > figcaption { position: static; width: auto; text-align: left; }
+  #tab-steering-rollouts .cap-label { text-align: left; }
+  #tab-steering-rollouts .tbl-scroll { overflow: visible; }
+
   /* Title block: title + meta + epigraph on the left, abstract on the right. */
   .paper-header {
     display: grid;

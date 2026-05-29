@@ -19,10 +19,11 @@ const { title, currentSlug } = Astro.props;
     <link rel="preload" href="/fonts/cardo-regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cardo-bold.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/cardo-italic.woff2" as="font" type="font/woff2" crossorigin />
-    <!-- Sans-serif (UI chrome, interactive figures): Alegreya Sans, a companion to Cardo. -->
+    <!-- Sans-serif (UI chrome, interactive figures): Alegreya Sans, a companion to
+         Cardo. Monospace (tokens, prompts, code): Fira Code. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Fira+Code:wght@400;500&display=swap" />
     <script is:inline>
       // Restore a user-chosen sidebar width before first paint (no flash).
       try {
@@ -42,7 +43,10 @@ const { title, currentSlug } = Astro.props;
     </main>
     <div class="lightbox" id="lightbox" aria-hidden="true">
       <button class="lightbox-close" aria-label="Close">×</button>
-      <img alt="" />
+      <figure class="lightbox-fig">
+        <img alt="" />
+        <figcaption class="lightbox-cap"></figcaption>
+      </figure>
     </div>
     <script is:inline>
       const toggle = document.getElementById("toc-toggle");
@@ -82,13 +86,52 @@ const { title, currentSlug } = Astro.props;
       const lb = document.getElementById("lightbox");
       if (lb) {
         const lbImg = lb.querySelector("img");
-        const open = (src, alt) => { lbImg.src = src; lbImg.alt = alt || ""; lb.classList.add("open"); lb.setAttribute("aria-hidden", "false"); };
-        const close = () => { lb.classList.remove("open"); lb.setAttribute("aria-hidden", "true"); lbImg.removeAttribute("src"); };
+        const lbCap = lb.querySelector(".lightbox-cap");
+        const lbFig = lb.querySelector(".lightbox-fig");
+        // Keep the caption at its preferred width (--lb-cap-w); if a long caption
+        // would overflow the height left under the image, widen it toward the
+        // available space, and only enable scrolling if even full width won't fit.
+        const fitCaption = () => {
+          if (!lbCap.textContent.trim()) return;
+          lbCap.style.maxHeight = "none"; lbCap.style.overflowY = "visible"; lbCap.style.maxWidth = "";
+          const cs = getComputedStyle(lbFig);
+          const chromeV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + (parseFloat(cs.rowGap) || 0);
+          const imgH = lbImg.getBoundingClientRect().height || 0.75 * window.innerHeight;
+          const budget = Math.max(48, 0.94 * window.innerHeight - chromeV - imgH);
+          if (lbCap.scrollHeight <= budget + 1) return; // fits at the defined width
+          const maxW = 0.96 * window.innerWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+          const preferredW = lbCap.getBoundingClientRect().width;
+          const fitsAt = (w) => { lbCap.style.maxWidth = w + "px"; return lbCap.scrollHeight <= budget + 1; };
+          if (maxW <= preferredW || !fitsAt(maxW)) { // last resort: full width + scroll
+            lbCap.style.maxWidth = maxW + "px"; lbCap.style.maxHeight = budget + "px"; lbCap.style.overflowY = "auto";
+            return;
+          }
+          let lo = preferredW, hi = maxW; // narrowest width that avoids scrolling
+          for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2; if (fitsAt(mid)) hi = mid; else lo = mid; }
+          lbCap.style.maxWidth = Math.ceil(hi) + "px";
+        };
+        const open = (src, alt, captionHTML) => {
+          lbImg.onload = fitCaption;
+          lbImg.src = src; lbImg.alt = alt || "";
+          lbCap.innerHTML = captionHTML || "";
+          lb.classList.add("open"); lb.setAttribute("aria-hidden", "false");
+          fitCaption();
+        };
+        const close = () => {
+          lb.classList.remove("open"); lb.setAttribute("aria-hidden", "true");
+          lbImg.onload = null; lbImg.removeAttribute("src"); lbCap.innerHTML = "";
+          lbCap.style.maxWidth = lbCap.style.maxHeight = lbCap.style.overflowY = "";
+        };
+        window.addEventListener("resize", () => { if (lb.classList.contains("open")) fitCaption(); });
         document.addEventListener("click", (e) => {
           const img = e.target.closest(".fig-items img, .tbl-img");
-          if (img) { open(img.currentSrc || img.src, img.alt); }
+          if (img) {
+            const cap = img.closest("figure")?.querySelector(":scope > figcaption");
+            open(img.currentSrc || img.src, img.alt, cap ? cap.innerHTML : "");
+          }
         });
-        lb.addEventListener("click", close);
+        // Click the backdrop or image to dismiss; clicks inside the caption read/select without closing.
+        lb.addEventListener("click", (e) => { if (!e.target.closest(".lightbox-cap")) close(); });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
       }
     </script>

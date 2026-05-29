@@ -20,7 +20,7 @@ const Override = figureOverrides[node.label];
         <img
           src={item.svg ?? item.png}
           alt={item.alt ?? (node.number ? `Figure ${node.number}` : "figure")}
-          style={item.widthFrac ? `width:${Math.round(item.widthFrac * 100)}%` : undefined}
+          style={node.layout === "row" && item.widthFrac ? `width:${Math.round(item.widthFrac * 100)}%` : undefined}
           loading="lazy"
         />
       ))}

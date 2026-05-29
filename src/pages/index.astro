@@ -54,13 +54,12 @@ const titleNodes: InlineT[] =
           <div class="authors">
             {manifest.authors.map((a) => {
               const url = authorUrl(a.name);
-              return (
-                <span class="author">
-                  {url
-                    ? <a href={url} target="_blank" rel="noopener"><Inline nodes={a.name} /></a>
-                    : <Inline nodes={a.name} />}
-                </span>
-              );
+              // Keep the span free of surrounding whitespace, or it renders as a
+              // stray space before the comma separator (".author::after").
+              const inner = url
+                ? <a href={url} target="_blank" rel="noopener"><Inline nodes={a.name} /></a>
+                : <Inline nodes={a.name} />;
+              return <span class="author">{inner}</span>;
             })}
           </div>
           {manifest.affiliation && <div class="affiliation"><Inline nodes={manifest.affiliation} /></div>}

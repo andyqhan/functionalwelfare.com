@@ -31,7 +31,8 @@
 }
 
 :root {
-  --measure: 50rem;          /* main reading column (target; capped to fit) */
+  --measure: 54rem;          /* main reading column (target; capped to fit) */
+  --lb-cap-w: 72ch;          /* preferred width of a zoomed figure's caption (JS widens long ones before scrolling) */
   --note-margin: 8.5rem;     /* right margin for footnote sidenotes (sized for near-body footnote text) */
   --cap-margin: 11rem;       /* caption gutter; enhanced layout widens to 13rem */
   --gap: 1.4rem;
@@ -55,13 +56,13 @@
 
   --serif: "Cardo", Georgia, "Times New Roman", serif;
   --sans: "Alegreya Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "SF Mono", "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+  --mono: "Fira Code", ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
 }
 
 * { box-sizing: border-box; }
 
 html {
-  font-size: 19px;
+  font-size: 20px;
   scroll-behavior: smooth;
   scroll-padding-top: 1.5rem;
   -webkit-text-size-adjust: 100%;
@@ -123,7 +124,7 @@ body {
 .heading.lvl-1 { font-size: 2.1rem; margin: 3.2rem 0 1rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rule); }
 .heading.lvl-2 { font-size: 1.58rem; margin: 2.2rem 0 0.6rem; }
 .heading.lvl-3 { font-size: 1.34rem; margin: 1.7rem 0 0.5rem; }
-.heading.lvl-4 { font-size: 1.26rem; margin: 1.4rem 0 0.4rem; font-style: italic; } /* \paragraph: a bit larger than body */
+.heading.lvl-4 { font-size: 1.26rem; margin: 1.4rem 0 0.4rem; } /* \paragraph: a bit larger than body */
 .sec-num { color: var(--accent); font-weight: 700; margin-right: 0.4em; }
 .anchor { opacity: 0; margin-left: 0.4em; color: var(--accent); text-decoration: none; font-size: 0.8em; transition: opacity 0.15s; }
 .heading:hover .anchor { opacity: 0.5; }
@@ -143,7 +144,7 @@ a:hover { text-decoration: underline; }
 .hang-quote-s { text-indent: -0.30em; }
 .sc { font-variant: small-caps; letter-spacing: 0.02em; }
 /* Prose numbers lifted out of inline math (see InlineNode): inherit figure
-   style from context (oldstyle in body, lining/tabular in tables); never break. */
+   style from context (oldstyle in body, oldstyle/tabular in tables); never break. */
 .num { white-space: nowrap; }
 /* Tile names (Mold/Gold/Path) inside KaTeX math: render as true Cardo small caps
    (incl. vector subscripts), matching the \textsc small caps used in prose. */
@@ -159,6 +160,9 @@ li { margin: 0.2rem 0; text-align: justify; hyphens: auto; text-wrap: pretty; }
 code, .mono { font-family: var(--mono); font-size: 0.82em; font-feature-settings: "liga" 0, "calt" 0; }
 code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 .tok { font-family: var(--mono); font-size: 0.8em; background: #eef0f3; border: 1px solid #e0e3e8; border-radius: 3px; padding: 0.02em 0.3em; white-space: pre; font-feature-settings: "liga" 0, "calt" 0; }
+/* In tables (e.g. logit-lens), monospace tokens/code must not carry their own
+   gray chip — it would paint over the cell's highlight colour. */
+.tbl code, .tbl .tok { background: none; border-color: transparent; padding: 0; }
 
 .hl { padding: 0.05em 0.18em; border-radius: 2px; }
 .hl-red { background: var(--hl-red); }
@@ -239,26 +243,34 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
   column-gap: 1.6rem;
   align-items: start;
   margin: 2.4rem 0;
+  position: relative; /* containing block for the absolutely-placed caption */
 }
-/* In the two-column layout the caption hangs in the left gutter; justify it so
-   both edges stay flush in the narrow column. hyphenate-limit-chars (matching
-   body copy) keeps hyphenation from fragmenting short words. */
+/* The caption is absolutely placed in the left gutter so it's out of the grid's
+   height calculation: a long caption overflows *downward* past the figure (into
+   the empty gutter / over a following heading) instead of stretching the box and
+   leaving whitespace. It's pinned to the gutter (top/left 0, width = the gutter)
+   so it never bleeds horizontally over the content. justify + hyphenation keep
+   both edges flush in the narrow column. */
 .fig > figcaption,
-.tbl > figcaption { grid-column: 1; grid-row: 1; align-self: start; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; margin: 0; }
+.tbl > figcaption { grid-column: 1; grid-row: 1; position: absolute; top: 0; left: 0; width: var(--cap-margin); text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 6 3 2; text-wrap: pretty; margin: 0; }
 .fig > .fig-items,
 .tbl > .tbl-body { grid-column: 2; grid-row: 1; min-width: 0; }
 .fig-items { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: center; align-items: flex-end; }
 .fig-items img { max-width: 100%; height: auto; cursor: zoom-in; }
+/* A lone figure fills the reading column rather than honouring the LaTeX
+   width=…\textwidth fraction (those were tuned for the narrower print page).
+   Multi-image rows keep their per-item fractions so they sit side by side. */
+.fig-single .fig-items img { width: 100%; }
 .tbl-body { text-align: center; }
 .tbl-img { cursor: zoom-in; }
 
-figcaption { font-size: 1.05rem; line-height: 1.5; color: var(--muted); }
+figcaption { font-size: 0.9rem; line-height: 1.5; color: var(--muted); } /* match table body size */
 .cap-label { font-weight: 700; color: var(--ink); display: block; text-align: right; margin-bottom: 0.2rem; }
 
 /* ------------------------------- tables --------------------------------- */
 
 .tbl-scroll { overflow-x: auto; }
-.tbl table { border-collapse: collapse; font-size: 0.9rem; line-height: 1.4; margin: 0 auto; text-align: left; font-variant-numeric: lining-nums tabular-nums; }
+.tbl table { border-collapse: collapse; font-size: 0.9rem; line-height: 1.4; margin: 0 auto; text-align: left; font-variant-numeric: oldstyle-nums tabular-nums; }
 .tbl th, .tbl td { padding: 0.3em 0.7em; vertical-align: top; }
 .tbl th { font-weight: 700; border-bottom: 1.5px solid var(--ink); }
 .tbl tr:first-child th { border-top: 1.5px solid var(--ink); }
@@ -321,11 +333,34 @@ body.resizing { cursor: col-resize; user-select: none; }
   cursor: zoom-out; opacity: 0; transition: opacity 0.15s ease;
 }
 .lightbox.open { display: flex; opacity: 1; }
-.lightbox img {
-  max-width: 96vw; max-height: 94vh; object-fit: contain;
-  background: #fff; border-radius: 4px; padding: 1.2rem;
+/* White card holding the figure and its caption. The image takes a definite
+   height (the SVGs carry a small intrinsic pt size, so max-* alone left them
+   tiny) with width:auto, so it grows and its width follows the aspect ratio —
+   the card then hugs it. The caption sits below and shrinks/scrolls if long, so
+   the card never exceeds the viewport. object-fit:contain keeps the rare
+   ultra-wide figure undistorted when its width would exceed the column. */
+.lightbox-fig {
+  display: flex; flex-direction: column; align-items: center;
+  max-width: 96vw; max-height: 94vh;
+  margin: 0; padding: 1.2rem; gap: 0.85rem;
+  background: #fff; border-radius: 4px;
   box-shadow: 0 16px 60px rgba(0, 0, 0, 0.45);
 }
+.lightbox-fig img {
+  flex: 0 0 auto;
+  height: 75vh; width: auto;
+  max-width: 100%; object-fit: contain;
+}
+/* Preferred caption width is --lb-cap-w. fitCaption() (PaperLayout) widens it
+   toward the available space, and only sets max-height + overflow as a last
+   resort, so a long caption scrolls only when even the full width won't fit. */
+.lightbox-cap {
+  flex: 0 1 auto; max-width: var(--lb-cap-w);
+  margin: 0; cursor: auto;
+  font-size: 1rem; line-height: 1.5; color: var(--muted); text-align: left;
+}
+.lightbox-cap:empty { display: none; }
+.lightbox-cap .cap-label { display: inline; text-align: left; color: var(--ink); margin: 0; }
 .lightbox-close {
   position: fixed; top: 1rem; right: 1.2rem; z-index: 101;
   background: none; border: none; color: #fff; font-size: 2rem;
@@ -348,9 +383,21 @@ body.resizing { cursor: col-resize; user-select: none; }
   }
   .unit { padding-left: calc(var(--cap-margin) + var(--gap)); }
 
-  /* Only top-level section headings overhang into the left gutter (subheadings
-     stay aligned with the body text). Overrides the lvl-1 margin shorthand. */
+  /* Top-level section headings overhang wholesale into the left gutter.
+     Overrides the lvl-1 margin shorthand. */
   .heading.lvl-1 { margin-left: calc(-1 * (var(--cap-margin) + var(--gap))); }
+
+  /* Subheadings keep their text aligned with the body, but their section
+     marker hangs out into the left gutter (overhanging the text below). */
+  .heading.lvl-2,
+  .heading.lvl-3 { position: relative; }
+  .heading.lvl-2 > .sec-num,
+  .heading.lvl-3 > .sec-num {
+    position: absolute;
+    right: calc(100% + 0.5em);
+    margin-right: 0;
+    white-space: nowrap;
+  }
 
   /* Figures + tables: caption hangs in the gutter; content is centered over the
      text column (no longer breaking into the right note margin). */
@@ -362,8 +409,7 @@ body.resizing { cursor: col-resize; user-select: none; }
     column-gap: var(--gap);
   }
 
-  /* Title block: break out wider than the paper; title + meta + epigraph on the
-     left (tightly stacked), abstract on the right. */
+  /* Title block: title + meta + epigraph on the left, abstract on the right. */
   .paper-header {
     display: grid;
     /* Left column hugs the title (~the longest title line) instead of growing
@@ -371,15 +417,13 @@ body.resizing { cursor: col-resize; user-select: none; }
        pushed far to the right. The abstract takes the remaining width (up to a
        readable cap), so the header spans wide without opening a gap. */
     grid-template-columns: 30rem minmax(0, 40rem);
-    /* Normal widths: the pair packs left (small left margin). Only once both
-       columns hit their cap does the leftover center, so very wide screens stay
-       balanced instead of leaving a big gap on one side. */
-    justify-content: center;
+    /* Align the header to the paper edge (no breakout/padding) and pack the
+       columns left, so the title column starts exactly where the section
+       headings (e.g. "§1 Introduction") begin. */
+    justify-content: start;
     column-gap: 1rem;
     align-items: start;
-    padding: 0 1rem;
-    margin-left: calc(-1 * var(--hdr-breakout));
-    margin-right: calc(-1 * var(--hdr-breakout));
+    padding: 0;
   }
   .hdr-left { display: block; }
   .paper-title { margin: 0 0 0.5rem; }
@@ -410,13 +454,14 @@ body.resizing { cursor: col-resize; user-select: none; }
   .sidebar-resizer { display: none; }
 }
 
-/* Stack figure/table captions below the content once the viewport is too narrow
-   for a comfortable side caption (same point the rest of the layout simplifies). */
-@media (max-width: 1400px) {
+/* Side captions live only in the enhanced layout (≥1560px), where the body text
+   is indented and the gutter is empty — so a long caption can overflow downward
+   into it. Below that there's no empty gutter, so stack the caption below the
+   content instead (normal flow, left-aligned). */
+@media (max-width: 1559.98px) {
   .fig, .tbl { display: block; }
   .fig > .fig-items, .tbl > .tbl-body { margin-bottom: 0.5rem; }
-  /* No longer in the gutter — left-align the stacked caption (and its label). */
-  .fig > figcaption, .tbl > figcaption { text-align: left; }
+  .fig > figcaption, .tbl > figcaption { position: static; text-align: left; }
   .cap-label { text-align: left; }
 }
 

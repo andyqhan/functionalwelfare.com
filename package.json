@@ -20,6 +20,7 @@
     "katex": "^0.17.0"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.9",
     "@types/katex": "^0.16.8",
     "@types/node": "^25.9.1",
     "tsx": "^4.22.3",

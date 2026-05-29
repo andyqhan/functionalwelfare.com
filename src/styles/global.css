@@ -189,7 +189,7 @@ code { background: #f1f0ec; padding: 0.05em 0.32em; border-radius: 3px; }
 
 .authors { font-size: 1.12rem; }
 .author:not(:last-child)::after { content: ", "; }
-.affiliation { color: var(--muted); font-style: italic; }
+.affiliation { color: var(--muted); }
 .arxiv a { font-family: var(--mono); }
 .abstract-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.13em; color: var(--accent); font-weight: 700; margin: 0 0 0.4rem; }
 

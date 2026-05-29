@@ -720,6 +720,13 @@ function findFirst(nodes: Ast.Node[], pred: (n: Ast.Node) => boolean): Ast.Node 
     if (n.type === "environment" || n.type === "group") {
       const r = findFirst(n.content, pred);
       if (r) return r;
+    } else if (n.type === "macro" && n.args) {
+      // Descend into macro arguments so box-wrapping macros (\resizebox,
+      // \scalebox, \adjustbox, ...) don't hide the tabular/figure inside.
+      for (const a of n.args) {
+        const r = findFirst(a.content, pred);
+        if (r) return r;
+      }
     }
   }
   return null;

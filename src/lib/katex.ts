@@ -11,6 +11,9 @@ import katex from "katex";
 const sc = (name: string) => `\\htmlClass{sc-math}{\\text{${name}}}`;
 
 const MACROS: Record<string, string> = {
+  // KaTeX has no \textsc; some math in the paper writes tile names as
+  // \textsc{mold} directly (e.g. App. L). Render it as true small caps too.
+  "\\textsc": "\\htmlClass{sc-math}{\\text{#1}}",
   "\\Mold": sc("Mold"),
   "\\Gold": sc("Gold"),
   "\\Path": sc("Path"),

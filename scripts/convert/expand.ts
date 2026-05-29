@@ -14,7 +14,7 @@ import path from "node:path";
 import type * as Ast from "@unified-latex/unified-latex-types";
 import { PAPER_SRC } from "../../paper.config.ts";
 import { parseLatex } from "./parse.ts";
-import { isMacro, mArg, plainText } from "./ast.ts";
+import { mArg, plainText } from "./ast.ts";
 
 const TIKZ_MARKERS = [
   "\\begin{tikzpicture}",
@@ -59,7 +59,9 @@ export function expandInputs(nodes: Ast.Node[], depth = 0): Ast.Node[] {
   if (depth > 12) return nodes; // cycle guard
   const out: Ast.Node[] = [];
   for (const n of nodes) {
-    if (isMacro(n, "input") || isMacro(n, "include")) {
+    // Plain discriminant check (not the isMacro type guard) so the false branch
+    // keeps macros in the union for the macro-args recursion below.
+    if (n.type === "macro" && (n.content === "input" || n.content === "include")) {
       const rel = plainText(mArg(n)).trim();
       const abs = resolveInputPath(rel);
       if (!abs) {
@@ -78,6 +80,13 @@ export function expandInputs(nodes: Ast.Node[], depth = 0): Ast.Node[] {
     }
     if (n.type === "environment" || n.type === "group") {
       out.push({ ...n, content: expandInputs(n.content, depth + 1) } as Ast.Node);
+      continue;
+    }
+    if (n.type === "macro" && n.args) {
+      // Expand \input nested inside macro arguments, e.g.
+      // \resizebox{\textwidth}{!}{\input{figures/.../table.tex}}.
+      const args = n.args.map((a) => ({ ...a, content: expandInputs(a.content, depth + 1) }));
+      out.push({ ...n, args } as Ast.Node);
       continue;
     }
     out.push(n);

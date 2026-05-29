@@ -8,6 +8,11 @@
 // game.py) and the reward rule in pytorch_trainer/rollout.py; the visual style
 // matches ../valence-neurips/figures/maze_figure_v2.
 //
+// Two intentional deviations from the source, for nicer interaction: episodes are
+// not capped at a fixed number of turns (you can keep moving — the maze edge is the
+// only wall), and the maze is generated at 13×13 and cropped to its 11×11 interior,
+// so there is no Mold boundary ring around the playable area.
+//
 // The three tile types use the paper's affectively-neutral names: Path 🧾,
 // Gold 📐 (+20), Mold 📇 (−10). (Internally the ported code calls them
 // path/goal/lava to mirror the source, but nothing user-facing says lava/goal.)
@@ -28,7 +33,6 @@ const num = node.number;
       <section class="panel prompt-panel">
         <div class="panel-head">Prompt</div>
         <div class="prompt-bubble">
-          <div class="wind-msg" hidden></div>
           <div class="prompt-text"></div>
         </div>
         <div class="dpad" role="group" aria-label="Move the mousebot">
@@ -57,7 +61,7 @@ const num = node.number;
     </div>
 
     <div class="maze-bar">
-      <div class="stat"><span class="stat-k">Turn</span> <b class="turns">0</b><span class="stat-k"> / 5</span></div>
+      <div class="stat"><span class="stat-k">Turn</span> <b class="turns">0</b></div>
       <div class="stat reward-stat">
         <span class="stat-k">Reward</span> <b class="reward">0.0</b>
         <span class="delta-host"></span>
@@ -81,7 +85,7 @@ const num = node.number;
     Interactive maze environment. You can drive the agent with <b>N/E/S/W</b>. The
     model only ever sees the text prompt on the left, never the bird’s-eye view on the right. You can toggle the
     three additional maze features used in training: <b>wind</b> (a random gust frustrates the best-laid plans of mice and Qwen), <b>tile melting</b> (tiles turn to Mold once you leave them), and <b>shuffled prompt</b> (the order the directions are listed in is
-    randomized, once per training episode). Here each episode is 5 moves on an 11×11 grid, though in training the agents do
+    randomized, once per training episode). Here you can roam an 11×11 grid for as many moves as you like, though in training the agents do
     15-step trajectories on a 100×100 grid.
   </figcaption>
 </figure>
@@ -97,14 +101,22 @@ const num = node.number;
     --m-accent: #6c5ce7;
     --m-hatch: rgba(225, 150, 145, 0.95);
     --m-sans: var(--sans);
+    /* The widget's content width: two equal columns + the gap between them. The
+       status bar and toggles are constrained to this so they line up with the
+       prompt/maze columns instead of spanning the full (wider) figure. */
+    --m-col: 18rem;
+    --m-gap: 1.4rem;
+    --m-w: calc(2 * var(--m-col) + var(--m-gap));
     font-family: var(--m-sans);
     color: var(--ink);
   }
 
-  .maze-panels { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: stretch; justify-content: center; }
+  .maze-panels { display: flex; flex-wrap: wrap; gap: var(--m-gap); align-items: stretch; justify-content: center; max-width: var(--m-w); margin-inline: auto; }
   .panel { min-width: 0; display: flex; flex-direction: column; }
-  .prompt-panel { flex: 1 1 16rem; }
-  .maze-panel { flex: 0 1 18rem; }
+  /* The prompt is a near-fixed length, so the left column is sized to wrap it into
+     a tidy block (no grow) and its bubble hugs that text rather than stretching. */
+  .prompt-panel { flex: 0 1 var(--m-col); justify-content: center; }
+  .maze-panel { flex: 0 1 var(--m-col); }
 
   .panel-head {
     font-family: var(--serif);
@@ -121,17 +133,6 @@ const num = node.number;
     border-radius: 10px;
     padding: 0.85rem 1rem;
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
-    flex: 1;
-  }
-  .wind-msg {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #b8632e;
-    background: #fbf0e6;
-    border: 1px solid #f0d8c2;
-    border-radius: 6px;
-    padding: 0.3rem 0.5rem;
-    margin-bottom: 0.6rem;
   }
   .prompt-text { font-size: 0.9rem; line-height: 1.7; color: var(--ink); }
   /* NOTE: styles for elements built at runtime by JS (.cell, .em, .delta) live
@@ -159,6 +160,8 @@ const num = node.number;
     height: 2rem;
     object-fit: contain;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
   }
   .db {
@@ -170,6 +173,8 @@ const num = node.number;
     border: 1.5px solid var(--rule);
     border-radius: 8px;
     cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
     transition: background 0.12s, border-color 0.12s, transform 0.05s;
   }
   .db:hover:not(:disabled) { border-color: var(--m-accent); background: #f3f1fc; }
@@ -200,6 +205,8 @@ const num = node.number;
     transform: translate(-50%, -50%);
     transition: left 0.18s ease, top 0.18s ease;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
     z-index: 6;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
   }
@@ -215,7 +222,8 @@ const num = node.number;
     align-items: center;
     gap: 1.4rem;
     flex-wrap: wrap;
-    margin-top: 1.1rem;
+    max-width: var(--m-w);
+    margin: 1.1rem auto 0;
     padding-top: 0.8rem;
     border-top: 1px solid var(--rule);
   }
@@ -241,7 +249,7 @@ const num = node.number;
   .reset:hover { border-color: var(--m-accent); background: #f3f1fc; }
 
   /* ---- toggles ---- */
-  .toggles { display: flex; flex-wrap: wrap; gap: 0.4rem 1.3rem; margin-top: 0.8rem; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 0.4rem 1.3rem; max-width: var(--m-w); margin: 0.8rem auto 0; }
   .toggles label {
     display: inline-flex;
     align-items: center;
@@ -255,8 +263,6 @@ const num = node.number;
   .wind-freq[hidden] { display: none; }
   .wind-range { width: 6rem; accent-color: var(--m-accent); cursor: pointer; }
   .wind-pct { font-variant-numeric: tabular-nums; min-width: 2.6em; }
-
-  .maze-app.done .dpad { opacity: 0.55; }
 
   @media (max-width: 900px) {
     .maze-fig > .maze-app { grid-column: 1; }
@@ -326,8 +332,8 @@ const num = node.number;
     if (!root) return;
 
     // ---- constants (ported from rl-sentiment-vector) ----
-    var N = 11;
-    var MAX_TURNS = 5;
+    var N = 11; // visible (and playable) grid size
+    var GEN = N + 2; // generate 13×13, crop the outer ring → no Mold boundary
     var STEP_PENALTY = -0.1,
       GOAL_REWARD = 20,
       LAVA_PENALTY = -10;
@@ -341,12 +347,10 @@ const num = node.number;
     var ri = function (a, b) { return a + Math.floor(Math.random() * (b - a + 1)); };
 
     // ---- DOM ----
-    var app = root.querySelector(".maze-app");
     var cellsEl = root.querySelector(".cells");
     var trailEl = root.querySelector(".trail");
     var botEl = root.querySelector(".mousebot");
     var promptEl = root.querySelector(".prompt-text");
-    var windEl = root.querySelector(".wind-msg");
     var turnsEl = root.querySelector(".turns");
     var rewardEl = root.querySelector(".reward");
     var deltaHost = root.querySelector(".delta-host");
@@ -360,23 +364,26 @@ const num = node.number;
     var S = null;
 
     // ---- maze generation (port of MazeGenerator.generate) ----
+    // The source keeps a lava boundary as the maze wall. Here we instead generate a
+    // GEN×GEN (13×13) maze and crop its outer ring, so the visible N×N (11×11) grid
+    // is all interior — no Mold boundary — and the grid edge itself is the wall.
     function generateMaze() {
       var grid = [];
-      for (var y = 0; y < N; y++) {
+      for (var y = 0; y < GEN; y++) {
         grid.push([]);
-        for (var x = 0; x < N; x++) grid[y].push("lava");
+        for (var x = 0; x < GEN; x++) grid[y].push("lava");
       }
       // random walk that always begins at the centre, so the player can start there
-      var CENTER = (N - 1) / 2; // (5, 5) on an 11×11 grid
-      var px = CENTER,
-        py = CENTER;
+      var GC = (GEN - 1) / 2; // (6, 6) — centre of the 13×13
+      var px = GC,
+        py = GC;
       grid[py][px] = "path";
-      var interior = N - 2;
+      var interior = GEN - 2;
       var walk = ri(interior * 5, interior * 15);
       var steps = [[0, -1], [0, 1], [1, 0], [-1, 0]];
       for (var i = 0; i < walk; i++) {
         var valid = steps.filter(function (d) {
-          return px + d[0] >= 1 && px + d[0] < N - 1 && py + d[1] >= 1 && py + d[1] < N - 1;
+          return px + d[0] >= 1 && px + d[0] < GEN - 1 && py + d[1] >= 1 && py + d[1] < GEN - 1;
         });
         if (!valid.length) break;
         var d = valid[Math.floor(Math.random() * valid.length)];
@@ -386,8 +393,8 @@ const num = node.number;
       }
       // clamp interior lava fraction into [10%, 50%]
       var lavaCells = [];
-      for (var iy = 1; iy < N - 1; iy++)
-        for (var ix = 1; ix < N - 1; ix++)
+      for (var iy = 1; iy < GEN - 1; iy++)
+        for (var ix = 1; ix < GEN - 1; ix++)
           if (grid[iy][ix] === "lava") lavaCells.push([ix, iy]);
       var totalInterior = interior * interior;
       var minLava = Math.floor(totalInterior * 0.1) + 1;
@@ -402,8 +409,8 @@ const num = node.number;
       // place goals on a fraction of path tiles, scaled to remaining lava
       var lavaCount = 0,
         pathTiles = [];
-      for (var jy = 1; jy < N - 1; jy++)
-        for (var jx = 1; jx < N - 1; jx++) {
+      for (var jy = 1; jy < GEN - 1; jy++)
+        for (var jx = 1; jx < GEN - 1; jx++) {
           if (grid[jy][jx] === "lava") lavaCount++;
           else if (grid[jy][jx] === "path") pathTiles.push([jx, jy]);
         }
@@ -412,9 +419,16 @@ const num = node.number;
       for (var g = 0; g < Math.min(numGoals, pathTiles.length); g++) {
         grid[pathTiles[g][1]][pathTiles[g][0]] = "goal";
       }
-      // guarantee the centre is a Path tile so the player always starts on (5, 5)
-      grid[CENTER][CENTER] = "path";
-      return { grid: grid, start: [CENTER, CENTER] };
+      // guarantee the centre is a Path tile so the player always starts there
+      grid[GC][GC] = "path";
+      // crop the outer ring → the visible N×N maze (the cropped edges are the wall)
+      var cropped = [];
+      for (var cy = 0; cy < N; cy++) {
+        cropped.push([]);
+        for (var cx = 0; cx < N; cx++) cropped[cy].push(grid[cy + 1][cx + 1]);
+      }
+      var CENTER = (N - 1) / 2; // (5, 5) on the cropped 11×11
+      return { grid: cropped, start: [CENTER, CENTER] };
     }
 
     function shuffle(a) {
@@ -449,10 +463,8 @@ const num = node.number;
         reward: 0,
         order: opts.shuffle ? shuffle(ORDER.slice()) : ORDER.slice(),
         windMsg: null,
-        done: false,
         trail: [[m.start[0], m.start[1]]],
       };
-      app.classList.remove("done");
       deltaHost.innerHTML = "";
       render();
     }
@@ -486,11 +498,10 @@ const num = node.number;
     }
 
     function move(dir) {
-      if (S.done) return;
       var d = DIRS[dir];
       var nx = S.pos[0] + d[0],
         ny = S.pos[1] + d[1];
-      if (!inBounds(nx, ny)) return;
+      if (!inBounds(nx, ny)) return; // the maze edge is the only wall
       S.windMsg = null;
       // melt the tile we step off (if it is Path)
       if (opts.melt && getTile(S.pos[0], S.pos[1]) === "path")
@@ -501,10 +512,6 @@ const num = node.number;
       S.trail.push([nx, ny]);
       delta += applyWind(); // wind adds no extra step penalty, just its tile effect
       S.reward += delta;
-      if (S.steps >= MAX_TURNS) {
-        S.done = true;
-        app.classList.add("done");
-      }
       render();
       flashDelta(delta);
     }
@@ -545,11 +552,10 @@ const num = node.number;
       // prompt
       renderPrompt();
 
-      // buttons
+      // buttons (only disabled when a move would leave the grid)
       for (var dir in DIRS) {
         var dd = DIRS[dir];
-        var ok = !S.done && inBounds(S.pos[0] + dd[0], S.pos[1] + dd[1]);
-        buttons[dir].disabled = !ok;
+        buttons[dir].disabled = !inBounds(S.pos[0] + dd[0], S.pos[1] + dd[1]);
       }
 
       // status
@@ -559,14 +565,9 @@ const num = node.number;
 
     // Render the prompt exactly as the model receives it: one continuous string,
     // plain emoji, no decorative styling. Only in-bounds directions are listed
-    // (matches get_available_directions).
+    // (matches get_available_directions). Wind, when it blows, is prepended verbatim
+    // to the prompt — no styled box — exactly as game.py's get_prompt does.
     function renderPrompt() {
-      if (S.windMsg) {
-        windEl.textContent = S.windMsg;
-        windEl.hidden = false;
-      } else {
-        windEl.hidden = true;
-      }
       var clauses = [];
       for (var i = 0; i < S.order.length; i++) {
         var dir = S.order[i];
@@ -581,7 +582,9 @@ const num = node.number;
         clauses[0] = clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1);
         clauseText = clauses.join("; ") + ". ";
       }
+      var windPrefix = S.windMsg ? S.windMsg + " " : "";
       promptEl.textContent =
+        windPrefix +
         "You are in a maze. Currently, you're at location (" +
         S.pos[0] + ", " + S.pos[1] + "). " + clauseText +
         "Where do you move? Output only N/E/S/W without punctuation.";

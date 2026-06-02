@@ -113,12 +113,26 @@ if (fig) {
       svg += `<line class="emoji-dim" x1="${x1.toFixed(2)}" y1="${cy.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${cy.toFixed(2)}" marker-start="url(#emoji-arrow-${stem})" marker-end="url(#emoji-arrow-${stem})"/>`;
       svg += `<text class="emoji-dimlbl" x="${((x1 + x2) / 2).toFixed(2)}" y="${(cy + 12).toFixed(2)}" text-anchor="middle">Δ = ${del.value.toFixed(3)} (CAD axis)</text>`;
     } else {
-      const y1 = sy(del.from), y2 = sy(del.to), cx = sx(del.cross);
+      const y1 = sy(del.from), y2 = sy(del.to);
+      const clusterLeft = sx(Math.min(...fig.trio.map((t) => t.x)));
       const clusterRight = sx(Math.max(...fig.trio.map((t) => t.x)));
+      const lbl = `Δ = ${del.value.toFixed(3)} (prompt axis)`;
+      const lblW = lbl.length * 5.2; // approx label width at the .emoji-dimlbl font
+      // The builder places this vertical Δ bracket to the right of the cluster;
+      // when the cluster sits near the right edge (desserts) that arrow + its
+      // right-extending label would spill outside the plot. Keep it on the right
+      // only if it fits, else bracket to the LEFT of the cluster (as upstream
+      // does) with the label extending inward.
+      let cx = sx(del.cross), anchor = "start", tx = cx + 5;
+      if (cx + 5 + lblW > ML + PLOTW - 2) {
+        cx = Math.max(ML + 2, clusterLeft - 16);
+        anchor = "end";
+        tx = cx - 5;
+      }
       for (const Y of [y1, y2])
         svg += `<line class="emoji-guide" x1="${cx.toFixed(2)}" y1="${Y.toFixed(2)}" x2="${clusterRight.toFixed(2)}" y2="${Y.toFixed(2)}"/>`;
       svg += `<line class="emoji-dim" x1="${cx.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${cx.toFixed(2)}" y2="${y2.toFixed(2)}" marker-start="url(#emoji-arrow-${stem})" marker-end="url(#emoji-arrow-${stem})"/>`;
-      svg += `<text class="emoji-dimlbl" x="${(cx + 5).toFixed(2)}" y="${((y1 + y2) / 2).toFixed(2)}" text-anchor="start" dominant-baseline="central">Δ = ${del.value.toFixed(3)} (prompt axis)</text>`;
+      svg += `<text class="emoji-dimlbl" x="${tx.toFixed(2)}" y="${((y1 + y2) / 2).toFixed(2)}" text-anchor="${anchor}" dominant-baseline="central">${lbl}</text>`;
     }
   }
 

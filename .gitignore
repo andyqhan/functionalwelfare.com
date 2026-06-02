@@ -16,3 +16,4 @@ public/paper/
 
 # playwright mcp debugging artifacts
 .playwright-mcp/
+/.agent-shell/

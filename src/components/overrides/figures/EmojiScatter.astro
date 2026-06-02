@@ -1,0 +1,323 @@
+---
+// Interactive replacement for the emoji-scatter figures (Figs 39, 40). Each
+// plots the full ~5.2k-emoji cloud in sentiment space (x = cosine sim with the
+// CAD sentiment vector, y = with the prompt sentiment vector) and highlights one
+// maze-tile "trio" (mold / gold / path). The static upstream figure labels only
+// those 3; here every one of the ~5.2k emoji is hoverable — mousing over a dot
+// reveals its glyph, name, and both cosine similarities.
+//
+// The cloud, axes, zero rules, trio markers/labels and the Δ annotation are
+// rendered server-side (faithful, works without JS); a small inline script adds
+// nearest-emoji hit-testing and the hover tooltip. The cloud is drawn as a
+// single round-capped <path> (one DOM node for thousands of dots) for speed.
+//
+// Data: src/data/figures/emoji-scatters.json, joined from the upstream
+// emoji-vector CSV by scripts/figure-data/build-emoji-scatters.mjs.
+import Inline from "../../paper/Inline.astro";
+import { preventWidow } from "../../../lib/typography";
+import type { FigureBlock, Footnote } from "../../../lib/ir";
+import emojiData from "../../../data/figures/emoji-scatters.json";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const num = node.number;
+
+function stemForItem(svg?: string): string | null {
+  if (!svg) return null;
+  const base = svg.split("/").pop()!.replace(/\.svg$/, "");
+  return base.includes("__") ? base.split("__").pop()! : base;
+}
+type Fig = (typeof emojiData.figures)[keyof typeof emojiData.figures];
+const stem = node.items.map((it) => stemForItem(it.svg)).find((s) => !!s && s in emojiData.figures) ?? null;
+const fig: Fig | null = stem ? (emojiData.figures as Record<string, Fig>)[stem] : null;
+
+const { limits, points } = emojiData;
+
+// =============================== geometry ================================
+const ML = 44, MR = 14, MT = 10, MB = 26;
+const PLOTW = 430, PLOTH = 370;
+const W = ML + PLOTW + MR;
+const H = MT + PLOTH + MB;
+
+const sx = (x: number) => ML + ((x - limits.xlo) / (limits.xhi - limits.xlo)) * PLOTW;
+const sy = (y: number) => MT + ((limits.yhi - y) / (limits.yhi - limits.ylo)) * PLOTH;
+
+const MINUS = "−";
+const fix = (v: number, n: number) => {
+  const s = Math.abs(v).toFixed(n);
+  return v < 0 ? MINUS + s : s;
+};
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function niceTicks(lo: number, hi: number): number[] {
+  const span = hi - lo || 1;
+  const raw = span / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+  const out: number[] = [];
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(Math.abs(t) < 1e-9 ? 0 : t);
+  return out;
+}
+
+let svg = "";
+let dataJs = "";
+
+if (fig) {
+  const trioSet = new Set(fig.trio.map((t) => t.e));
+
+  // L-shaped axes (bottom + left)
+  svg += `<line class="emoji-axis" x1="${ML}" y1="${MT}" x2="${ML}" y2="${MT + PLOTH}"/>`;
+  svg += `<line class="emoji-axis" x1="${ML}" y1="${MT + PLOTH}" x2="${ML + PLOTW}" y2="${MT + PLOTH}"/>`;
+
+  // ticks + labels
+  for (const t of niceTicks(limits.xlo, limits.xhi)) {
+    const X = sx(t);
+    if (X < ML - 0.5 || X > ML + PLOTW + 0.5) continue;
+    svg += `<line class="emoji-tick" x1="${X.toFixed(2)}" y1="${MT + PLOTH}" x2="${X.toFixed(2)}" y2="${MT + PLOTH + 4}"/>`;
+    svg += `<text class="emoji-ticklbl" x="${X.toFixed(2)}" y="${MT + PLOTH + 13}" text-anchor="middle">${fix(t, 2)}</text>`;
+  }
+  for (const t of niceTicks(limits.ylo, limits.yhi)) {
+    const Y = sy(t);
+    if (Y < MT - 0.5 || Y > MT + PLOTH + 0.5) continue;
+    svg += `<line class="emoji-tick" x1="${ML - 4}" y1="${Y.toFixed(2)}" x2="${ML}" y2="${Y.toFixed(2)}"/>`;
+    svg += `<text class="emoji-ticklbl" x="${ML - 6}" y="${(Y + 3).toFixed(2)}" text-anchor="end">${fix(t, 2)}</text>`;
+  }
+
+  // zero rules (dotted crosshair)
+  if (limits.xlo < 0 && 0 < limits.xhi)
+    svg += `<line class="emoji-zero" x1="${sx(0).toFixed(2)}" y1="${MT}" x2="${sx(0).toFixed(2)}" y2="${MT + PLOTH}"/>`;
+  if (limits.ylo < 0 && 0 < limits.yhi)
+    svg += `<line class="emoji-zero" x1="${ML}" y1="${sy(0).toFixed(2)}" x2="${ML + PLOTW}" y2="${sy(0).toFixed(2)}"/>`;
+
+  // background cloud: one round-capped path of near-zero segments → dots
+  let d = "";
+  for (const p of points) {
+    if (trioSet.has(p.e)) continue;
+    d += `M${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}l.01 0`;
+  }
+  svg += `<path class="emoji-cloud" d="${d}"/>`;
+
+  // Δ annotation (drawn under the trio markers)
+  const del = fig.delta;
+  if (del) {
+    if (del.axis === "cad") {
+      const x1 = sx(del.from), x2 = sx(del.to), cy = sy(del.cross);
+      const clusterBottom = sy(Math.min(...fig.trio.map((t) => t.y)));
+      for (const X of [x1, x2])
+        svg += `<line class="emoji-guide" x1="${X.toFixed(2)}" y1="${cy.toFixed(2)}" x2="${X.toFixed(2)}" y2="${clusterBottom.toFixed(2)}"/>`;
+      svg += `<line class="emoji-dim" x1="${x1.toFixed(2)}" y1="${cy.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${cy.toFixed(2)}" marker-start="url(#emoji-arrow-${stem})" marker-end="url(#emoji-arrow-${stem})"/>`;
+      svg += `<text class="emoji-dimlbl" x="${((x1 + x2) / 2).toFixed(2)}" y="${(cy + 12).toFixed(2)}" text-anchor="middle">Δ = ${del.value.toFixed(3)} (CAD axis)</text>`;
+    } else {
+      const y1 = sy(del.from), y2 = sy(del.to), cx = sx(del.cross);
+      const clusterRight = sx(Math.max(...fig.trio.map((t) => t.x)));
+      for (const Y of [y1, y2])
+        svg += `<line class="emoji-guide" x1="${cx.toFixed(2)}" y1="${Y.toFixed(2)}" x2="${clusterRight.toFixed(2)}" y2="${Y.toFixed(2)}"/>`;
+      svg += `<line class="emoji-dim" x1="${cx.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${cx.toFixed(2)}" y2="${y2.toFixed(2)}" marker-start="url(#emoji-arrow-${stem})" marker-end="url(#emoji-arrow-${stem})"/>`;
+      svg += `<text class="emoji-dimlbl" x="${(cx + 5).toFixed(2)}" y="${((y1 + y2) / 2).toFixed(2)}" text-anchor="start" dominant-baseline="central">Δ = ${del.value.toFixed(3)} (prompt axis)</text>`;
+    }
+  }
+
+  // trio: leader line → boxed label, then marker on top
+  for (const t of fig.trio) {
+    const mx = sx(t.x), my = sy(t.y);
+    const lxp = sx(t.lx), lyp = sy(t.ly);
+    const padX = 4, charW = 5.0, fontH = 11;
+    const textW = t.label.length * charW;
+    const boxW = textW + padX * 2;
+    const boxX = t.ha === "left" ? lxp : lxp - boxW;
+    const boxY = lyp - fontH / 2 - 3;
+    const textX = t.ha === "left" ? lxp + padX : lxp - padX;
+    svg += `<line class="emoji-leader" x1="${mx.toFixed(2)}" y1="${my.toFixed(2)}" x2="${lxp.toFixed(2)}" y2="${lyp.toFixed(2)}" stroke="${t.color}"/>`;
+    svg += `<rect class="emoji-labbox" x="${boxX.toFixed(2)}" y="${boxY.toFixed(2)}" width="${boxW.toFixed(2)}" height="${(fontH + 6).toFixed(2)}" rx="3" stroke="${t.color}"/>`;
+    svg += `<text class="emoji-lab" x="${textX.toFixed(2)}" y="${lyp.toFixed(2)}" text-anchor="${t.ha === "left" ? "start" : "end"}" dominant-baseline="central">${esc(t.label)}</text>`;
+    svg += `<circle class="emoji-mark" cx="${mx.toFixed(2)}" cy="${my.toFixed(2)}" r="5" fill="${t.color}"/>`;
+  }
+
+  dataJs = JSON.stringify({
+    W, ML, MT, PLOTW, PLOTH,
+    xlo: limits.xlo, xhi: limits.xhi, ylo: limits.ylo, yhi: limits.yhi,
+    trio: fig.trio.map((t) => t.e),
+    points: points.map((p) => ({ e: p.e, n: p.n, x: p.x, y: p.y })),
+  });
+}
+---
+
+<figure id={node.id ?? node.label} class="fig emoji-scatter-fig">
+  {fig ? (
+    <div class="emoji-app">
+      <div class="emoji-suptitle">{fig.supTitle}</div>
+      <div class="emoji-paneltitle">{fig.panelTitle}</div>
+      <div class="emoji-plotwrap">
+        <div class="emoji-ylabel">{fig.ylabel}</div>
+        <div class="emoji-svgbox">
+          <svg class="emoji-svg" viewBox={`0 0 ${W} ${H}`} role="img"
+            aria-label={`Emoji sentiment scatter: ${points.length} emoji`}>
+            <defs>
+              <marker id={`emoji-arrow-${stem}`} markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
+                <path d="M1 1 L6 3.5 L1 6" fill="none" stroke="#222" stroke-width="1" />
+              </marker>
+            </defs>
+            <Fragment set:html={svg} />
+          </svg>
+          <div class="emoji-hl" hidden></div>
+          <div class="emoji-tip" hidden></div>
+        </div>
+        <div class="emoji-xlabel">{fig.xlabel}</div>
+      </div>
+      <script type="application/json" class="emoji-data" set:html={dataJs} />
+    </div>
+  ) : (
+    node.items.map((item) => <img src={item.svg ?? item.png} alt={`Figure ${node.number}`} loading="lazy" />)
+  )}
+
+  {(node.caption.length > 0 || num) && (
+    <figcaption>
+      {num && <span class="cap-label">Figure {num}.</span>}{" "}
+      <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .emoji-scatter-fig > .emoji-app { grid-column: 2; grid-row: 1; min-width: 0; }
+
+  .emoji-app { font-family: var(--sans); color: var(--ink); max-width: 34rem; margin-inline: auto; }
+  .emoji-suptitle { text-align: center; font-weight: 700; font-size: 0.95rem; }
+  .emoji-paneltitle { text-align: center; font-weight: 600; font-size: 0.82rem; color: var(--muted); margin: 0.1rem 0 0.5rem; }
+
+  .emoji-plotwrap {
+    display: grid;
+    grid-template-columns: 1.1rem 1fr;
+    grid-template-rows: 1fr auto;
+    align-items: center;
+  }
+  .emoji-ylabel {
+    grid-column: 1; grid-row: 1;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    text-align: center; font-size: 0.76rem; justify-self: center; white-space: nowrap;
+  }
+  .emoji-svgbox { grid-column: 2; grid-row: 1; position: relative; min-width: 0; }
+  .emoji-xlabel { grid-column: 2; grid-row: 2; text-align: center; font-size: 0.76rem; margin-top: 0.1rem; }
+  .emoji-svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; }
+</style>
+
+<!-- Static SVG bits + JS-built tooltip; namespaced under .emoji-scatter-fig. -->
+<style is:global>
+  .emoji-scatter-fig .emoji-axis { stroke: #666; stroke-width: 0.7; }
+  .emoji-scatter-fig .emoji-tick { stroke: #666; stroke-width: 0.6; }
+  .emoji-scatter-fig .emoji-ticklbl { fill: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+  .emoji-scatter-fig .emoji-zero { stroke: #888; stroke-width: 0.6; stroke-dasharray: 1.5 2.5; }
+  .emoji-scatter-fig .emoji-cloud { fill: none; stroke: #b6bec4; stroke-width: 1.5; stroke-linecap: round; stroke-opacity: 0.55; }
+  .emoji-scatter-fig .emoji-guide { stroke: #555; stroke-width: 0.5; }
+  .emoji-scatter-fig .emoji-dim { stroke: #222; stroke-width: 0.8; }
+  .emoji-scatter-fig .emoji-dimlbl { fill: var(--ink); font-size: 9px; }
+  .emoji-scatter-fig .emoji-leader { stroke-width: 0.8; }
+  .emoji-scatter-fig .emoji-labbox { fill: #fff; fill-opacity: 0.92; stroke-width: 1; }
+  .emoji-scatter-fig .emoji-lab { fill: #111; font-size: 9px; }
+  .emoji-scatter-fig .emoji-mark { stroke: #000; stroke-width: 0.9; }
+
+  .emoji-scatter-fig .emoji-hl {
+    position: absolute; width: 0; height: 0; pointer-events: none; border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--ink); transform: translate(-50%, -50%);
+    transition: left 0.04s linear, top 0.04s linear; z-index: 3;
+  }
+  .emoji-scatter-fig .emoji-tip {
+    position: absolute; z-index: 5; pointer-events: none; background: #fff;
+    border: 1px solid var(--rule); border-radius: 7px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 0.4rem 0.55rem; font-family: var(--sans); font-size: 0.78rem; line-height: 1.35;
+    color: var(--ink); white-space: nowrap;
+  }
+  .emoji-scatter-fig .emoji-tip-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
+  .emoji-scatter-fig .emoji-tip-glyph { font-size: 1.3rem; line-height: 1; }
+  .emoji-scatter-fig .emoji-tip-name { font-weight: 700; font-size: 0.84rem; }
+  .emoji-scatter-fig .emoji-tip-row { display: flex; justify-content: space-between; gap: 0.9rem; }
+  .emoji-scatter-fig .emoji-tip-k { color: var(--muted); }
+  .emoji-scatter-fig .emoji-tip-v { font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 900px) {
+    .emoji-scatter-fig > .emoji-app { grid-column: 1; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var MINUS = "−";
+    function fix(v, n) {
+      var s = Math.abs(v).toFixed(n);
+      return v < 0 ? MINUS + s : s;
+    }
+
+    document.querySelectorAll(".emoji-scatter-fig .emoji-app").forEach(function (app) {
+      var dataEl = app.querySelector(".emoji-data");
+      if (!dataEl) return;
+      var D = JSON.parse(dataEl.textContent);
+      var svg = app.querySelector(".emoji-svg");
+      var box = app.querySelector(".emoji-svgbox");
+      var hl = app.querySelector(".emoji-hl");
+      var tip = app.querySelector(".emoji-tip");
+
+      // precompute pixel coords once
+      var P = D.points;
+      var sx = function (x) { return D.ML + ((x - D.xlo) / (D.xhi - D.xlo)) * D.PLOTW; };
+      var sy = function (y) { return D.MT + ((D.yhi - y) / (D.yhi - D.ylo)) * D.PLOTH; };
+      for (var i = 0; i < P.length; i++) { P[i].px = sx(P[i].x); P[i].py = sy(P[i].y); }
+
+      function nearest(ev) {
+        var pt = svg.createSVGPoint();
+        pt.x = ev.clientX; pt.y = ev.clientY;
+        var ctm = svg.getScreenCTM();
+        if (!ctm) return null;
+        var loc = pt.matrixTransform(ctm.inverse());
+        var best = null, bd = Infinity;
+        for (var j = 0; j < P.length; j++) {
+          var dx = P[j].px - loc.x, dy = P[j].py - loc.y;
+          var d2 = dx * dx + dy * dy;
+          if (d2 < bd) { bd = d2; best = P[j]; }
+        }
+        return bd <= 36 ? best : null; // ~6 user-unit radius
+      }
+
+      function show(p, ev) {
+        var rect = box.getBoundingClientRect();
+        var scale = rect.width / D.W;
+        hl.hidden = false;
+        hl.style.left = p.px * scale + "px";
+        hl.style.top = p.py * scale + "px";
+        hl.style.width = hl.style.height = Math.max(10, 8 * scale) + "px";
+
+        tip.hidden = false;
+        tip.innerHTML =
+          '<div class="emoji-tip-head"><span class="emoji-tip-glyph">' + p.e + "</span>" +
+          '<span class="emoji-tip-name">' + p.n + "</span></div>" +
+          '<div class="emoji-tip-row"><span class="emoji-tip-k">CAD sentiment</span>' +
+          '<span class="emoji-tip-v">' + fix(p.x, 3) + "</span></div>" +
+          '<div class="emoji-tip-row"><span class="emoji-tip-k">prompt sentiment</span>' +
+          '<span class="emoji-tip-v">' + fix(p.y, 3) + "</span></div>";
+
+        var tw = tip.offsetWidth, th = tip.offsetHeight;
+        var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        var tx = mx + 12, ty = my + 12;
+        if (tx + tw > rect.width) tx = mx - tw - 12;
+        if (ty + th > rect.height) ty = my - th - 12;
+        if (tx < 0) tx = 2;
+        if (ty < 0) ty = 2;
+        tip.style.left = tx + "px";
+        tip.style.top = ty + "px";
+      }
+
+      function hide() { hl.hidden = true; tip.hidden = true; }
+
+      svg.addEventListener("pointermove", function (ev) {
+        var p = nearest(ev);
+        if (p) show(p, ev);
+        else hide();
+      });
+      svg.addEventListener("pointerleave", hide);
+    });
+  })();
+</script>

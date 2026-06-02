@@ -1,0 +1,460 @@
+---
+// Interactive replacement for the emotion-scatter figures (Figs 3, 18, 19, 20,
+// 25, 26). Each panel projects the 171 emotion concept vectors onto two reward /
+// sentiment vectors (x, y = cosine similarities); the static upstream figure
+// bakes in only ~23 de-overlapped labels. Here every one of the 171 points is
+// hoverable: mousing over a dot reveals its emotion, both cosine similarities,
+// and its distance from the origin.
+//
+// The SVG (axes, points, OLS fit, baked labels, colourbar, legend) is rendered
+// server-side so it is faithful and works without JS; a small inline script
+// adds nearest-point hit-testing, the hover tooltip, and label highlighting.
+//
+// Data: src/data/figures/emotion-scatters.json, joined from the upstream
+// .dat/.tex by scripts/figure-data/build-emotion-scatters.mjs. Visual style
+// mirrors valence-neurips/figures/tikz/emotion_scatter/_common.tex.
+import Inline from "../../paper/Inline.astro";
+import { preventWidow } from "../../../lib/typography";
+import { renderMath } from "../../../lib/katex";
+import type { FigureBlock, Footnote } from "../../../lib/ir";
+import scatterData from "../../../data/figures/emotion-scatters.json";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const num = node.number;
+
+// ---- map each figure item (an SVG filename) → a scatter key in the data ----
+const FILE_TO_KEY: Record<string, string> = {
+  emotion_scatter_base: "base",
+  emotion_scatter_instruct_drgrpo: "instruct_drgrpo",
+  emotion_scatter_instruct_drgrpo_fft: "instruct_drgrpo_fft",
+  emotion_scatter_instruct_sft_fft: "instruct_sft_fft",
+  emotion_scatter_base_control: "base_control",
+  emotion_scatter_instruct_drgrpo_control: "instruct_drgrpo_control",
+  emotion_scatter_cad: "cad",
+  emotion_scatter_prompt: "prompt",
+  emotion_scatter_cad_vs_prompt: "cad_vs_prompt",
+};
+function keyForItem(svg?: string): string | null {
+  if (!svg) return null;
+  const base = svg.split("/").pop()!.replace(/\.svg$/, "");
+  const stem = base.includes("__") ? base.split("__").pop()! : base;
+  return FILE_TO_KEY[stem] ?? null;
+}
+
+type Panel = (typeof scatterData.panels)[keyof typeof scatterData.panels];
+const panels: Panel[] = node.items
+  .map((it) => keyForItem(it.svg))
+  .filter((k): k is string => !!k && k in scatterData.panels)
+  .map((k) => (scatterData.panels as Record<string, Panel>)[k]);
+
+// =============================== geometry ================================
+const PLOT = 360; // square plot, internal user units (maps the 12cm tikz axis)
+const ML = 38; // left margin (y tick labels)
+const MT = 10; // top margin
+const MB = 30; // bottom margin (x tick labels + axis title sits in HTML below)
+const CB_GAP = 16; // plot → colourbar gap
+const CB_W = 10; // colourbar width
+const CB_LABEL = 22; // room for the rotated colourbar title
+const MR = CB_GAP + CB_W + CB_LABEL;
+const W = ML + PLOT + MR;
+const H = MT + PLOT + MB;
+const R = 2.5; // point radius
+const CORNER_FONT = 12.5; // gold/mold axis-extreme labels (~\large 12pt)
+const MINOR_FONT = 10.4; // near-origin + off-fit labels (~\normalsize 10pt)
+
+// matplotlib "plasma", 21 stops (see _common.tex) — point + colourbar colour.
+const PLASMA: [number, number, number][] = [
+  [0.050383, 0.029803, 0.527975], [0.193374, 0.018354, 0.59033],
+  [0.293754, 0.011892, 0.631017], [0.385783, 0.011885, 0.66131],
+  [0.471457, 0.005678, 0.659897], [0.550287, 0.038907, 0.640576],
+  [0.62269, 0.08558, 0.601295], [0.688179, 0.132381, 0.546133],
+  [0.748289, 0.180653, 0.488189], [0.802844, 0.232815, 0.430286],
+  [0.852126, 0.276106, 0.378359], [0.898192, 0.317856, 0.330805],
+  [0.937221, 0.359683, 0.287076], [0.967671, 0.412331, 0.234208],
+  [0.987622, 0.467208, 0.183703], [0.994738, 0.530498, 0.130914],
+  [0.99244, 0.59516, 0.084381], [0.974176, 0.661406, 0.075381],
+  [0.939874, 0.733683, 0.087108], [0.89293, 0.808124, 0.103312],
+  [0.940015, 0.975158, 0.131326],
+];
+function plasma(t: number): string {
+  const u = Math.max(0, Math.min(1, t)) * (PLASMA.length - 1);
+  const i = Math.floor(u);
+  const f = u - i;
+  const a = PLASMA[i];
+  const b = PLASMA[Math.min(i + 1, PLASMA.length - 1)];
+  const c = (k: number) => Math.round(255 * (a[k] + (b[k] - a[k]) * f));
+  return `rgb(${c(0)},${c(1)},${c(2)})`;
+}
+
+const LABEL_COLOR: Record<string, string> = {
+  gold: "#5B8DB8",
+  mold: "#D47971",
+  origin: "#222222",
+};
+const MINUS = "−";
+const fix = (v: number, n: number) => {
+  const s = Math.abs(v).toFixed(n);
+  return v < 0 ? MINUS + s : s;
+};
+const signed = (v: number, n: number) => (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(n);
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// Axis title (mixed text + $math$) → HTML, KaTeX for the math segments.
+function axisTitleHtml(label: string): string {
+  return label
+    .split("$")
+    .map((seg, i) => (i % 2 ? renderMath(seg, false) : esc(seg)))
+    .join("");
+}
+// Short token for tooltip rows: the math vector if present, else the trailing noun.
+function tipTokenHtml(label: string): string {
+  const m = /\$(.+)\$/.exec(label);
+  if (m) return renderMath(m[1], false);
+  return esc(label.replace(/^Cosine similarity with\s*/i, "").replace(/\s*vector$/i, ""));
+}
+
+interface Built {
+  panel: Panel;
+  svg: string;
+  js: string; // JSON payload for the hover script
+  xTitle: string;
+  yTitle: string;
+}
+
+function buildPanel(panel: Panel): Built {
+  const v = panel.vabs;
+  const sx = (x: number) => ML + ((x + v) / (2 * v)) * PLOT;
+  const sy = (y: number) => MT + ((v - y) / (2 * v)) * PLOT;
+
+  // ticks at integer multiples of `tick` within [-v, v]
+  const ticks: number[] = [];
+  for (let k = -Math.floor(v / panel.tick + 1e-9); k <= Math.floor(v / panel.tick + 1e-9); k++)
+    ticks.push(k * panel.tick);
+
+  let s = "";
+
+  // colourbar gradient (unique id per panel)
+  const gid = `emo-cb-${panel.key}`;
+  s += `<defs><linearGradient id="${gid}" x1="0" y1="1" x2="0" y2="0">`;
+  for (let i = 0; i < PLASMA.length; i++)
+    s += `<stop offset="${(i / (PLASMA.length - 1)).toFixed(4)}" stop-color="${plasma(i / (PLASMA.length - 1))}"/>`;
+  s += `</linearGradient></defs>`;
+
+  // zero rules (light crosshair through the origin)
+  if (-v < 0 && 0 < v) {
+    s += `<line class="emo-zero" x1="${sx(0).toFixed(2)}" y1="${MT}" x2="${sx(0).toFixed(2)}" y2="${MT + PLOT}"/>`;
+    s += `<line class="emo-zero" x1="${ML}" y1="${sy(0).toFixed(2)}" x2="${ML + PLOT}" y2="${sy(0).toFixed(2)}"/>`;
+  }
+
+  // axis frame
+  s += `<rect class="emo-frame" x="${ML}" y="${MT}" width="${PLOT}" height="${PLOT}"/>`;
+
+  // ticks + labels
+  for (const t of ticks) {
+    const X = sx(t);
+    const Y = sy(t);
+    s += `<line class="emo-tick" x1="${X.toFixed(2)}" y1="${MT + PLOT}" x2="${X.toFixed(2)}" y2="${MT + PLOT + 4}"/>`;
+    s += `<text class="emo-ticklbl" x="${X.toFixed(2)}" y="${MT + PLOT + 14}" text-anchor="middle">${fix(t, 2)}</text>`;
+    s += `<line class="emo-tick" x1="${ML - 4}" y1="${Y.toFixed(2)}" x2="${ML}" y2="${Y.toFixed(2)}"/>`;
+    s += `<text class="emo-ticklbl" x="${ML - 6}" y="${(Y + 3).toFixed(2)}" text-anchor="end">${fix(t, 2)}</text>`;
+  }
+
+  // OLS best-fit line (clipped to the box)
+  const [p1, p2] = panel.ols;
+  s += `<line class="emo-ols" x1="${sx(p1[0]).toFixed(2)}" y1="${sy(p1[1]).toFixed(2)}" x2="${sx(p2[0]).toFixed(2)}" y2="${sy(p2[1]).toFixed(2)}"/>`;
+
+  // points (coloured by distance from origin)
+  s += `<g class="emo-pts">`;
+  for (const pt of panel.points) {
+    s += `<circle cx="${sx(pt.x).toFixed(2)}" cy="${sy(pt.y).toFixed(2)}" r="${R}" fill="${plasma(pt.d / panel.pmax)}"/>`;
+  }
+  s += `</g>`;
+
+  // baked, de-overlapped labels + connectors
+  s += `<g class="emo-labels">`;
+  for (const lab of panel.labels) {
+    const color = lab.cls === "outlier" ? panel.residualColor : LABEL_COLOR[lab.cls];
+    const font = lab.cls === "gold" || lab.cls === "mold" ? CORNER_FONT : MINOR_FONT;
+    const weight = lab.cls === "outlier" ? 400 : 700;
+    s += `<line class="emo-conn" x1="${sx(lab.x0).toFixed(2)}" y1="${sy(lab.y0).toFixed(2)}" x2="${sx(lab.tx).toFixed(2)}" y2="${sy(lab.ty).toFixed(2)}"/>`;
+    s += `<text class="emo-lab" data-e="${esc(lab.e)}" x="${sx(lab.tx).toFixed(2)}" y="${sy(lab.ty).toFixed(2)}" text-anchor="middle" dominant-baseline="central" fill="${color}" font-size="${font}" font-weight="${weight}">${esc(lab.e)}</text>`;
+  }
+  s += `</g>`;
+
+  // colourbar
+  const cbx = ML + PLOT + CB_GAP;
+  s += `<rect class="emo-cb" x="${cbx}" y="${MT}" width="${CB_W}" height="${PLOT}" fill="url(#${gid})"/>`;
+  s += `<text class="emo-cb-lbl" x="${cbx + CB_W + 14}" y="${MT + PLOT / 2}" text-anchor="middle" transform="rotate(90 ${cbx + CB_W + 14} ${MT + PLOT / 2})">Distance from origin</text>`;
+
+  // OLS legend, in the corner opposite the data trend
+  const legW = 150;
+  const legH = 20;
+  const lx = panel.legendCorner === "NW" ? ML + 6 : ML + PLOT - legW - 6;
+  const ly = MT + 6;
+  s += `<g class="emo-legend"><rect x="${lx}" y="${ly}" width="${legW}" height="${legH}" rx="3"/>`;
+  s += `<line class="emo-ols" x1="${lx + 8}" y1="${ly + legH / 2}" x2="${lx + 30}" y2="${ly + legH / 2}"/>`;
+  s += `<text x="${lx + 36}" y="${ly + legH / 2 + 3.5}">OLS: slope ${signed(panel.slope, 2)}, R=${signed(panel.r, 3)}</text>`;
+  s += `</g>`;
+
+  // hover hit-test payload
+  const js = JSON.stringify({
+    W, H, vabs: v, ML, MT, PLOT, pmax: panel.pmax,
+    xTip: tipTokenHtml(panel.xlabel),
+    yTip: tipTokenHtml(panel.ylabel),
+    points: panel.points.map((p) => ({
+      e: p.e, x: p.x, y: p.y, d: p.d, cls: p.lab,
+      px: +sx(p.x).toFixed(2), py: +sy(p.y).toFixed(2),
+    })),
+  });
+
+  return {
+    panel,
+    svg: s,
+    js,
+    xTitle: axisTitleHtml(panel.xlabel),
+    yTitle: axisTitleHtml(panel.ylabel),
+  };
+}
+
+const built = panels.map(buildPanel);
+const single = built.length <= 1;
+---
+
+<figure id={node.id ?? node.label} class="fig emo-scatter-fig">
+  <div class:list={["emo-app", { single }]}>
+    {built.map((b) => (
+      <div class="emo-panel" data-key={b.panel.key}>
+        <div class="emo-plotwrap">
+          <div class="emo-ylabel"><Fragment set:html={b.yTitle} /></div>
+          <div class="emo-svgbox">
+            <svg
+              class="emo-svg"
+              viewBox={`0 0 ${W} ${H}`}
+              role="img"
+              aria-label={`Emotion scatter: ${b.panel.points.length} emotions`}
+            >
+              <Fragment set:html={b.svg} />
+            </svg>
+            <div class="emo-hl" hidden></div>
+            <div class="emo-tip" hidden></div>
+          </div>
+          <div class="emo-xlabel"><Fragment set:html={b.xTitle} /></div>
+        </div>
+        <script type="application/json" class="emo-data" set:html={b.js} />
+      </div>
+    ))}
+  </div>
+
+  {(node.caption.length > 0 || num) && (
+    <figcaption>
+      {num && <span class="cap-label">Figure {num}.</span>}{" "}
+      <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .emo-scatter-fig > .emo-app { grid-column: 2; grid-row: 1; min-width: 0; }
+
+  .emo-app {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem 1.4rem;
+    justify-content: center;
+    align-items: flex-start;
+    font-family: var(--sans);
+    color: var(--ink);
+  }
+  .emo-panel { flex: 1 1 300px; min-width: 0; max-width: 30rem; }
+  .emo-app.single .emo-panel { flex: 0 1 32rem; }
+
+  /* plot grid: [ylabel | svg] over [_ | xlabel] */
+  .emo-plotwrap {
+    display: grid;
+    grid-template-columns: 1.2rem 1fr;
+    grid-template-rows: 1fr auto;
+    align-items: center;
+  }
+  .emo-ylabel {
+    grid-column: 1; grid-row: 1;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--ink);
+    justify-self: center;
+  }
+  .emo-svgbox { grid-column: 2; grid-row: 1; position: relative; min-width: 0; }
+  .emo-xlabel {
+    grid-column: 2; grid-row: 2;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--ink);
+    margin-top: 0.1rem;
+  }
+  /* KaTeX in the small axis titles shouldn't inflate line height */
+  .emo-ylabel :global(.katex), .emo-xlabel :global(.katex) { font-size: 1em; }
+
+  .emo-svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; }
+</style>
+
+<!-- Styles for static SVG bits + the JS-built tooltip/highlight. Namespaced
+     under .emo-scatter-fig so the global rules don't leak site-wide. -->
+<style is:global>
+  .emo-scatter-fig .emo-frame { fill: none; stroke: #666; stroke-width: 0.7; }
+  .emo-scatter-fig .emo-zero { stroke: #dddddd; stroke-width: 0.7; }
+  .emo-scatter-fig .emo-tick { stroke: #666; stroke-width: 0.6; }
+  .emo-scatter-fig .emo-ticklbl { fill: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+  .emo-scatter-fig .emo-ols { stroke: #999999; stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+  .emo-scatter-fig .emo-pts circle { stroke: #fff; stroke-width: 0.5; opacity: 0.9; }
+  .emo-scatter-fig .emo-conn { stroke: #bbb; stroke-width: 0.4; }
+  .emo-scatter-fig .emo-lab { paint-order: stroke; stroke: #fff; stroke-width: 2.6px; stroke-linejoin: round; }
+  .emo-scatter-fig .emo-lab.dim { opacity: 0.28; }
+  .emo-scatter-fig .emo-lab.active { stroke-width: 3px; }
+  .emo-scatter-fig .emo-cb-lbl { fill: var(--muted); font-size: 9.5px; }
+  .emo-scatter-fig .emo-legend rect { fill: #fff; fill-opacity: 0.85; stroke: #00000022; }
+  .emo-scatter-fig .emo-legend text { fill: var(--ink); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+  /* highlight ring tracking the hovered point */
+  .emo-scatter-fig .emo-hl {
+    position: absolute;
+    width: 0; height: 0;
+    pointer-events: none;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--ink);
+    background: transparent;
+    transform: translate(-50%, -50%);
+    transition: left 0.04s linear, top 0.04s linear;
+    z-index: 3;
+  }
+
+  /* hover tooltip */
+  .emo-scatter-fig .emo-tip {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 0.4rem 0.55rem;
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--ink);
+    max-width: 16rem;
+    white-space: nowrap;
+  }
+  .emo-scatter-fig .emo-tip-emotion { font-weight: 700; font-size: 0.86rem; margin-bottom: 0.15rem; }
+  .emo-scatter-fig .emo-tip-row { display: flex; justify-content: space-between; gap: 0.8rem; }
+  .emo-scatter-fig .emo-tip-k { color: var(--muted); }
+  .emo-scatter-fig .emo-tip-v { font-variant-numeric: tabular-nums; }
+  .emo-scatter-fig .emo-tip-k .katex { font-size: 0.95em; }
+
+  @media (max-width: 900px) {
+    .emo-scatter-fig > .emo-app { grid-column: 1; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var MINUS = "−";
+    function fix(v, n) {
+      var s = Math.abs(v).toFixed(n);
+      return v < 0 ? MINUS + s : s;
+    }
+    var CLS_COLOR = { gold: "#5B8DB8", mold: "#D47971", origin: "#222222", outlier: "#1F7B4A" };
+
+    document.querySelectorAll(".emo-scatter-fig .emo-panel").forEach(function (panel) {
+      var dataEl = panel.querySelector(".emo-data");
+      if (!dataEl) return;
+      var D = JSON.parse(dataEl.textContent);
+      var svg = panel.querySelector(".emo-svg");
+      var box = panel.querySelector(".emo-svgbox");
+      var hl = panel.querySelector(".emo-hl");
+      var tip = panel.querySelector(".emo-tip");
+      var labels = {};
+      panel.querySelectorAll(".emo-lab").forEach(function (t) { labels[t.getAttribute("data-e")] = t; });
+
+      var current = null;
+
+      // map a client point to SVG user-space, then find the nearest data point
+      function nearest(ev) {
+        var pt = svg.createSVGPoint();
+        pt.x = ev.clientX;
+        pt.y = ev.clientY;
+        var ctm = svg.getScreenCTM();
+        if (!ctm) return null;
+        var loc = pt.matrixTransform(ctm.inverse());
+        var best = null, bd = Infinity;
+        for (var i = 0; i < D.points.length; i++) {
+          var p = D.points[i];
+          var dx = p.px - loc.x, dy = p.py - loc.y;
+          var d2 = dx * dx + dy * dy;
+          if (d2 < bd) { bd = d2; best = p; }
+        }
+        // hit threshold ~9 user units (a bit larger than the dot)
+        return bd <= 81 ? best : null;
+      }
+
+      function show(p, ev) {
+        // highlight ring — position in CSS px relative to the box
+        var rect = box.getBoundingClientRect();
+        var scale = rect.width / D.W; // svg scaled uniformly to box width
+        hl.hidden = false;
+        hl.style.left = p.px * scale + "px";
+        hl.style.top = p.py * scale + "px";
+        hl.style.width = hl.style.height = Math.max(9, 7 * scale) + "px";
+
+        // tooltip
+        tip.hidden = false;
+        tip.innerHTML =
+          '<div class="emo-tip-emotion">' + p.e + "</div>" +
+          '<div class="emo-tip-row"><span class="emo-tip-k">' + D.xTip + "</span>" +
+          '<span class="emo-tip-v">' + fix(p.x, 3) + "</span></div>" +
+          '<div class="emo-tip-row"><span class="emo-tip-k">' + D.yTip + "</span>" +
+          '<span class="emo-tip-v">' + fix(p.y, 3) + "</span></div>" +
+          '<div class="emo-tip-row"><span class="emo-tip-k">distance</span>' +
+          '<span class="emo-tip-v">' + p.d.toFixed(3) + "</span></div>";
+        if (p.cls) tip.querySelector(".emo-tip-emotion").style.color = CLS_COLOR[p.cls] || "";
+
+        // position tooltip near cursor, flipping to stay inside the box
+        var tw = tip.offsetWidth, th = tip.offsetHeight;
+        var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        var tx = mx + 12, ty = my + 12;
+        if (tx + tw > rect.width) tx = mx - tw - 12;
+        if (ty + th > rect.height) ty = my - th - 12;
+        if (tx < 0) tx = 2;
+        if (ty < 0) ty = 2;
+        tip.style.left = tx + "px";
+        tip.style.top = ty + "px";
+
+        // emphasise this emotion's baked label (and dim the rest)
+        if (current !== p.e) {
+          for (var e in labels) labels[e].classList.add("dim");
+          if (labels[p.e]) { labels[p.e].classList.remove("dim"); labels[p.e].classList.add("active"); }
+          current = p.e;
+        }
+      }
+
+      function hide() {
+        hl.hidden = true;
+        tip.hidden = true;
+        for (var e in labels) labels[e].classList.remove("dim", "active");
+        current = null;
+      }
+
+      svg.addEventListener("pointermove", function (ev) {
+        var p = nearest(ev);
+        if (p) show(p, ev);
+        else hide();
+      });
+      svg.addEventListener("pointerleave", hide);
+    });
+  })();
+</script>

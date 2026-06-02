@@ -1,0 +1,353 @@
+---
+// Interactive replacement for the emotion-PCA / residual *projection* figures
+// (Figs 28, 29, 32). Each panel is a sorted bar chart: one bar per emotion,
+// sorted by its projection onto a principal component, with horizontal
+// reference lines marking where the steering / sentiment vectors project.
+//
+// The static upstream figure only labels every 5th emotion (rotated, tiny);
+// here every one of the 171 bars is hoverable — mousing over a bar reveals its
+// emotion and exact projection value, and highlights the bar.
+//
+// The SVG (axes, bars, zero rule, reference lines, ticks) is rendered
+// server-side so it is faithful and works without JS; a small inline script
+// adds nearest-bar hit-testing and the hover tooltip. Reference lines are
+// identified by a shared HTML legend below the panels (KaTeX for the math
+// vector names).
+//
+// Data: src/data/figures/emotion-projections.json, from the upstream cache
+// JSON by scripts/figure-data/build-emotion-projections.mjs.
+import Inline from "../../paper/Inline.astro";
+import { preventWidow } from "../../../lib/typography";
+import { renderMath } from "../../../lib/katex";
+import type { FigureBlock, Footnote } from "../../../lib/ir";
+import projData from "../../../data/figures/emotion-projections.json";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const num = node.number;
+
+// ---- map the figure's single SVG item → a figure entry in the data ----
+function stemForItem(svg?: string): string | null {
+  if (!svg) return null;
+  const base = svg.split("/").pop()!.replace(/\.svg$/, "");
+  return base.includes("__") ? base.split("__").pop()! : base;
+}
+type FigEntry = (typeof projData.figures)[keyof typeof projData.figures];
+type PanelData = (typeof projData.panels)[keyof typeof projData.panels];
+
+const stem = node.items.map((it) => stemForItem(it.svg)).find((s) => !!s && s in projData.figures) ?? null;
+const figEntry: FigEntry | null = stem ? (projData.figures as Record<string, FigEntry>)[stem] : null;
+const panelKeys: string[] = figEntry ? figEntry.panels : [];
+const panels: PanelData[] = panelKeys.map((k) => (projData.panels as Record<string, PanelData>)[k]);
+// reference-line styling is shared across a figure's panels — take it from the first.
+const refs = panels[0]?.refs ?? [];
+const barColor = projData.barColor;
+
+// =============================== geometry ================================
+const ML = 46; // left margin (y tick labels)
+const MR = 12; // right margin
+const MT = 8; // top margin
+const MB = 16; // bottom margin
+const PLOTW = 760;
+const PLOTH = 188;
+const W = ML + PLOTW + MR;
+const H = MT + PLOTH + MB;
+
+const MINUS = "−";
+const fix = (v: number, n: number) => {
+  const s = Math.abs(v).toFixed(n);
+  return v < 0 ? MINUS + s : s;
+};
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// mixed text + $math$ → HTML (KaTeX for the math segments)
+function mathTextHtml(label: string): string {
+  return label
+    .split("$")
+    .map((seg, i) => (i % 2 ? renderMath(seg, false) : esc(seg)))
+    .join("");
+}
+
+const DASH: Record<string, string> = { solid: "", dashed: "6 4", dotted: "1.5 3" };
+
+// "nice" ~5 ticks spanning [lo, hi], always including 0
+function niceTicks(lo: number, hi: number): number[] {
+  const span = hi - lo || 1;
+  const raw = span / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+  const out: number[] = [];
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(Math.abs(t) < 1e-9 ? 0 : t);
+  if (!out.includes(0) && lo < 0 && hi > 0) out.push(0);
+  return out;
+}
+
+interface Built {
+  panel: PanelData;
+  svg: string;
+  js: string;
+}
+
+function buildPanel(panel: PanelData): Built {
+  const vals = panel.bars.map((b) => b.v);
+  const refVals = panel.refs.map((r) => r.v);
+  const lo = Math.min(0, ...vals, ...refVals);
+  const hi = Math.max(0, ...vals, ...refVals);
+  const pad = (hi - lo) * 0.04;
+  const ymin = lo - pad;
+  const ymax = hi + pad;
+  const n = panel.bars.length;
+
+  const xAt = (i: number) => ML + ((i + 0.5) / n) * PLOTW;
+  const yAt = (v: number) => MT + ((ymax - v) / (ymax - ymin)) * PLOTH;
+  const bw = Math.max(1.2, (PLOTW / n) * 0.55);
+
+  let s = "";
+
+  // axis frame + zero rule
+  s += `<rect class="emo-proj-frame" x="${ML}" y="${MT}" width="${PLOTW}" height="${PLOTH}"/>`;
+  const y0 = yAt(0);
+  s += `<line class="emo-proj-zero" x1="${ML}" y1="${y0.toFixed(2)}" x2="${ML + PLOTW}" y2="${y0.toFixed(2)}"/>`;
+
+  // y ticks + labels
+  for (const t of niceTicks(ymin, ymax)) {
+    const Y = yAt(t);
+    s += `<line class="emo-proj-tick" x1="${ML - 4}" y1="${Y.toFixed(2)}" x2="${ML}" y2="${Y.toFixed(2)}"/>`;
+    s += `<text class="emo-proj-ticklbl" x="${ML - 6}" y="${(Y + 3).toFixed(2)}" text-anchor="end">${fix(t, 1)}</text>`;
+  }
+
+  // bars
+  s += `<g class="emo-proj-bars" fill="${barColor}">`;
+  for (let i = 0; i < n; i++) {
+    const v = panel.bars[i].v;
+    const x = xAt(i) - bw / 2;
+    const yv = yAt(v);
+    const top = Math.min(yv, y0);
+    const h = Math.abs(yv - y0);
+    s += `<rect data-i="${i}" x="${x.toFixed(2)}" y="${top.toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}"/>`;
+  }
+  s += `</g>`;
+
+  // reference lines (color/style/opacity baked; identity via the shared legend)
+  for (const r of panel.refs) {
+    const Y = yAt(r.v);
+    s += `<line class="emo-proj-ref" x1="${ML}" y1="${Y.toFixed(2)}" x2="${ML + PLOTW}" y2="${Y.toFixed(2)}" stroke="${r.color}" stroke-opacity="${r.opacity}" stroke-dasharray="${DASH[r.style] ?? ""}"/>`;
+  }
+
+  const js = JSON.stringify({
+    W, ML, MT, PLOTW, PLOTH, n, ymin, ymax, bw,
+    pcLabel: panel.pcLabel,
+    bars: panel.bars.map((b, i) => ({ e: b.e, v: b.v, cx: +xAt(i).toFixed(2) })),
+  });
+
+  return { panel, svg: s, js };
+}
+
+const built = panels.map(buildPanel);
+---
+
+<figure id={node.id ?? node.label} class="fig emo-proj-fig">
+  <div class="emo-proj-app">
+    {figEntry?.title && <div class="emo-proj-title">{figEntry.title}</div>}
+    {built.map((b) => (
+      <div class="emo-proj-panel" data-key={b.panel.key}>
+        <div class="emo-proj-plotwrap">
+          <div class="emo-proj-ylabel">{b.panel.pcLabel}</div>
+          <div class="emo-proj-svgbox">
+            <svg
+              class="emo-proj-svg"
+              viewBox={`0 0 ${W} ${H}`}
+              role="img"
+              aria-label={`${b.panel.pcLabel}: ${b.panel.bars.length} emotions sorted by projection`}
+            >
+              <Fragment set:html={b.svg} />
+            </svg>
+            <div class="emo-proj-tip" hidden></div>
+          </div>
+        </div>
+        <script type="application/json" class="emo-proj-data" set:html={b.js} />
+      </div>
+    ))}
+    {refs.length > 0 && (
+      <div class="emo-proj-legend">
+        {refs.map((r) => (
+          <span class="emo-proj-legitem">
+            <svg class="emo-proj-swatch" viewBox="0 0 24 8" aria-hidden="true">
+              <line x1="1" y1="4" x2="23" y2="4" stroke={r.color} stroke-opacity={r.opacity}
+                stroke-width="2" stroke-dasharray={DASH[r.style] ?? ""} />
+            </svg>
+            <span class="emo-proj-leglbl" set:html={mathTextHtml(r.full)} />
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {(node.caption.length > 0 || num) && (
+    <figcaption>
+      {num && <span class="cap-label">Figure {num}.</span>}{" "}
+      <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .emo-proj-fig > .emo-proj-app { grid-column: 2; grid-row: 1; min-width: 0; }
+
+  .emo-proj-app { font-family: var(--sans); color: var(--ink); }
+  .emo-proj-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.92rem;
+    margin-bottom: 0.7rem;
+  }
+  .emo-proj-panel { margin-bottom: 0.9rem; }
+
+  .emo-proj-plotwrap {
+    display: grid;
+    grid-template-columns: 1.1rem 1fr;
+    align-items: center;
+  }
+  .emo-proj-ylabel {
+    grid-column: 1;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--ink);
+    justify-self: center;
+    white-space: nowrap;
+  }
+  .emo-proj-svgbox { grid-column: 2; position: relative; min-width: 0; }
+  .emo-proj-svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; }
+
+  /* shared reference-line legend */
+  .emo-proj-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1.1rem;
+    justify-content: center;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+  }
+  .emo-proj-legitem { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .emo-proj-swatch { width: 24px; height: 8px; flex: none; }
+  .emo-proj-leglbl :global(.katex) { font-size: 1em; }
+</style>
+
+<!-- Styles for static SVG bits + the JS-built tooltip. Namespaced under
+     .emo-proj-fig so the global rules don't leak site-wide. -->
+<style is:global>
+  .emo-proj-fig .emo-proj-frame { fill: none; stroke: #666; stroke-width: 0.7; }
+  .emo-proj-fig .emo-proj-zero { stroke: #333; stroke-width: 0.6; }
+  .emo-proj-fig .emo-proj-tick { stroke: #666; stroke-width: 0.6; }
+  .emo-proj-fig .emo-proj-ticklbl { fill: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+  .emo-proj-fig .emo-proj-ref { stroke-width: 1.6; }
+  .emo-proj-fig .emo-proj-bars rect { transition: fill 0.05s linear; }
+  .emo-proj-fig .emo-proj-bars rect.active { fill: var(--accent, #6c5ce7); }
+
+  /* hover tooltip */
+  .emo-proj-fig .emo-proj-tip {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 0.4rem 0.55rem;
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .emo-proj-fig .emo-proj-tip-emotion { font-weight: 700; font-size: 0.86rem; margin-bottom: 0.15rem; }
+  .emo-proj-fig .emo-proj-tip-row { display: flex; justify-content: space-between; gap: 0.9rem; }
+  .emo-proj-fig .emo-proj-tip-k { color: var(--muted); }
+  .emo-proj-fig .emo-proj-tip-v { font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 900px) {
+    .emo-proj-fig > .emo-proj-app { grid-column: 1; }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var MINUS = "−";
+    function fix(v, n) {
+      var s = Math.abs(v).toFixed(n);
+      return v < 0 ? MINUS + s : s;
+    }
+
+    document.querySelectorAll(".emo-proj-fig .emo-proj-panel").forEach(function (panel) {
+      var dataEl = panel.querySelector(".emo-proj-data");
+      if (!dataEl) return;
+      var D = JSON.parse(dataEl.textContent);
+      var svg = panel.querySelector(".emo-proj-svg");
+      var box = panel.querySelector(".emo-proj-svgbox");
+      var tip = panel.querySelector(".emo-proj-tip");
+      var bars = panel.querySelectorAll(".emo-proj-bars rect");
+      var activeIdx = -1;
+
+      function setActive(i) {
+        if (i === activeIdx) return;
+        if (activeIdx >= 0 && bars[activeIdx]) bars[activeIdx].classList.remove("active");
+        if (i >= 0 && bars[i]) bars[i].classList.add("active");
+        activeIdx = i;
+      }
+
+      // map a client point to SVG user-space, pick the nearest bar by x
+      function locate(ev) {
+        var pt = svg.createSVGPoint();
+        pt.x = ev.clientX;
+        pt.y = ev.clientY;
+        var ctm = svg.getScreenCTM();
+        if (!ctm) return -1;
+        var loc = pt.matrixTransform(ctm.inverse());
+        if (loc.x < D.ML - 4 || loc.x > D.ML + D.PLOTW + 4) return -1;
+        if (loc.y < D.MT - 6 || loc.y > D.MT + D.PLOTH + 6) return -1;
+        var i = Math.round(((loc.x - D.ML) / D.PLOTW) * D.n - 0.5);
+        return i < 0 ? 0 : i >= D.n ? D.n - 1 : i;
+      }
+
+      function show(i, ev) {
+        var b = D.bars[i];
+        setActive(i);
+        tip.hidden = false;
+        tip.innerHTML =
+          '<div class="emo-proj-tip-emotion">' + b.e + "</div>" +
+          '<div class="emo-proj-tip-row"><span class="emo-proj-tip-k">' + D.pcLabel + "</span>" +
+          '<span class="emo-proj-tip-v">' + fix(b.v, 2) + "</span></div>";
+
+        var rect = box.getBoundingClientRect();
+        var tw = tip.offsetWidth, th = tip.offsetHeight;
+        var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        var tx = mx + 12, ty = my + 12;
+        if (tx + tw > rect.width) tx = mx - tw - 12;
+        if (ty + th > rect.height) ty = my - th - 12;
+        if (tx < 0) tx = 2;
+        if (ty < 0) ty = 2;
+        tip.style.left = tx + "px";
+        tip.style.top = ty + "px";
+      }
+
+      function hide() {
+        tip.hidden = true;
+        setActive(-1);
+      }
+
+      svg.addEventListener("pointermove", function (ev) {
+        var i = locate(ev);
+        if (i >= 0) show(i, ev);
+        else hide();
+      });
+      svg.addEventListener("pointerleave", hide);
+    });
+  })();
+</script>

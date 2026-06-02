@@ -1,0 +1,292 @@
+---
+// Interactive replacement for the "tracking" density-panel figures
+// (Figs 5, 6, 7 and their base-model variants 36, 37, 38). Each figure is a grid
+// of KDE density panels overlaying a positive vs. negative class, for the trained
+// model (solid line + light fill) and the maze-naive control (dashed line), with
+// Cohen's d annotations.
+//
+// The static figure can't disambiguate the four overlapping curves; here every
+// curve is hoverable — mousing over reveals the class, condition, the standard-
+// deviation position, and the density there. Rendered server-side as SVG
+// (faithful, works without JS) + a small inline script for hover.
+//
+// Data: src/data/figures/density-panels.json, parsed from the upstream tikz +
+// density .dat tables by scripts/figure-data/build-density-panels.mjs.
+import Inline from "../../paper/Inline.astro";
+import { preventWidow } from "../../../lib/typography";
+import { renderMath } from "../../../lib/katex";
+import type { FigureBlock, Footnote } from "../../../lib/ir";
+import densityData from "../../../data/figures/density-panels.json";
+
+interface Props {
+  node: FigureBlock;
+  footnotes?: Footnote[];
+}
+const { node, footnotes = [] } = Astro.props;
+const num = node.number;
+
+function stemForItem(svg?: string): string | null {
+  if (!svg) return null;
+  const base = svg.split("/").pop()!.replace(/\.svg$/, "");
+  return base.includes("__") ? base.split("__").pop()! : base;
+}
+type FigData = (typeof densityData.figures)[keyof typeof densityData.figures];
+const stem = node.items.map((it) => stemForItem(it.svg)).find((s) => !!s && s in densityData.figures) ?? null;
+const fig: FigData | null = stem ? (densityData.figures as Record<string, FigData>)[stem] : null;
+
+// =============================== geometry ================================
+const ML = 8, MR = 6, MT = 8, MB = 16;
+const PLOTW = 132, PLOTH = 96;
+const W = ML + PLOTW + MR;
+const H = MT + PLOTH + MB;
+
+const MINUS = "−";
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function mathTextHtml(label: string | null): string {
+  if (!label) return "";
+  return label.split("$").map((seg, i) => (i % 2 ? renderMath(seg, false) : esc(seg))).join("");
+}
+function niceTicks(lo: number, hi: number, n = 4): number[] {
+  const span = hi - lo || 1;
+  const raw = span / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+  const out: number[] = [];
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(Math.abs(t) < 1e-9 ? 0 : t);
+  return out;
+}
+const fixT = (v: number) => {
+  const s = Math.abs(v) % 1 === 0 ? Math.abs(v).toString() : Math.abs(v).toFixed(1);
+  return v < 0 ? MINUS + s : s;
+};
+
+// pos/neg × trained/naive curve keys, in draw order
+const CURVE_ORDER = ["trained_pos", "trained_neg", "naive_pos", "naive_neg"] as const;
+
+function buildPanel(panel: any, colors: any, classes: any) {
+  const curves = panel.curves;
+  const xmin = panel.xmin, xmax = panel.xmax;
+  let ymax = 0;
+  for (const k of CURVE_ORDER) if (curves[k]) for (const p of curves[k]) ymax = Math.max(ymax, p[1]);
+  ymax = ymax || 1;
+
+  const sx = (x: number) => ML + ((x - xmin) / (xmax - xmin)) * PLOTW;
+  const sy = (d: number) => MT + (1 - d / ymax) * PLOTH;
+  const sideOf = (k: string) => (k.endsWith("pos") ? colors.pos : colors.neg);
+
+  let s = "";
+  // bottom axis
+  s += `<line class="dp-axis" x1="${ML}" y1="${MT + PLOTH}" x2="${ML + PLOTW}" y2="${MT + PLOTH}"/>`;
+  // x ticks
+  for (const t of niceTicks(xmin, xmax)) {
+    if (t < xmin - 1e-9 || t > xmax + 1e-9) continue;
+    const X = sx(t);
+    s += `<line class="dp-tick" x1="${X.toFixed(2)}" y1="${MT + PLOTH}" x2="${X.toFixed(2)}" y2="${MT + PLOTH + 3}"/>`;
+    s += `<text class="dp-ticklbl" x="${X.toFixed(2)}" y="${MT + PLOTH + 10}" text-anchor="middle">${fixT(t)}</text>`;
+  }
+
+  // trained fills
+  for (const k of ["trained_pos", "trained_neg"]) {
+    if (!curves[k]) continue;
+    const c = sideOf(k);
+    const pts = curves[k].map((p: number[]) => `${sx(p[0]).toFixed(2)},${sy(p[1]).toFixed(2)}`);
+    const base = `${sx(xmax).toFixed(2)},${sy(0).toFixed(2)} ${sx(xmin).toFixed(2)},${sy(0).toFixed(2)}`;
+    s += `<polygon class="dp-fill" points="${pts.join(" ")} ${base}" fill="${c.fill}"/>`;
+  }
+  // lines: trained solid, then naive dashed
+  for (const k of CURVE_ORDER) {
+    if (!curves[k]) continue;
+    const c = sideOf(k);
+    const naive = k.startsWith("naive");
+    const pl = curves[k].map((p: number[]) => `${sx(p[0]).toFixed(2)},${sy(p[1]).toFixed(2)}`).join(" ");
+    s += `<polyline class="${naive ? "dp-line-naive" : "dp-line"}" points="${pl}" stroke="${c.line}"/>`;
+  }
+
+  // Cohen's d annotations (top-right)
+  if (panel.cohen?.trained != null)
+    s += `<text class="dp-d" x="${ML + PLOTW - 2}" y="${MT + 8}" text-anchor="end">d = ${panel.cohen.trained} (trained)</text>`;
+  if (panel.cohen?.naive != null)
+    s += `<text class="dp-d dp-d-naive" x="${ML + PLOTW - 2}" y="${MT + 17}" text-anchor="end">d = ${panel.cohen.naive} (naive)</text>`;
+
+  // hover payload: downsample (~every 3rd) curve points with baked px,py
+  const stride = 3;
+  const hp: any[] = [];
+  for (const k of CURVE_ORDER) {
+    if (!curves[k]) continue;
+    const [cond, sign] = k.split("_");
+    const label = `${sign === "pos" ? classes.pos : classes.neg} (${cond})`;
+    for (let i = 0; i < curves[k].length; i += stride) {
+      const p = curves[k][i];
+      hp.push({ label, x: p[0], d: p[1], px: +sx(p[0]).toFixed(2), py: +sy(p[1]).toFixed(2) });
+    }
+  }
+  return { svg: s, js: JSON.stringify({ W, ymax, points: hp }) };
+}
+
+const colors = fig?.colors;
+const classes = fig?.classes;
+const built = fig ? fig.panels.map((p: any) => buildPanel(p, colors, classes)) : [];
+const ncols = fig ? fig.grid.cols : 0;
+
+const legend = fig
+  ? [
+      { naive: false, color: fig.colors.pos.line, label: `${fig.classes.pos} (trained)` },
+      { naive: false, color: fig.colors.neg.line, label: `${fig.classes.neg} (trained)` },
+      { naive: true, color: fig.colors.pos.line, label: `${fig.classes.pos} (naive)` },
+      { naive: true, color: fig.colors.neg.line, label: `${fig.classes.neg} (naive)` },
+    ]
+  : [];
+---
+
+<figure id={node.id ?? node.label} class="fig dp-fig">
+  {fig ? (
+    <div class="dp-app" style={`--dp-cols:${ncols}`}>
+      {fig.suptitle && <div class="dp-suptitle" set:html={mathTextHtml(fig.suptitle)} />}
+      <div class="dp-grid">
+        {fig.panels.map((p: any, i: number) => (
+          <div class="dp-panel">
+            <div class="dp-title" set:html={mathTextHtml(p.title)} />
+            <div class="dp-plotrow">
+              <div class="dp-ylabel" set:html={mathTextHtml(p.ylabel)} />
+              <div class="dp-svgbox">
+                <svg class="dp-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="density panel">
+                  <Fragment set:html={built[i].svg} />
+                </svg>
+                <div class="dp-tip" hidden></div>
+              </div>
+            </div>
+            {p.xlabel && <div class="dp-xlabel">Standard deviations</div>}
+            <script type="application/json" class="dp-data" set:html={built[i].js} />
+          </div>
+        ))}
+      </div>
+      <div class="dp-legend">
+        {legend.map((l) => (
+          <span class="dp-legitem">
+            <svg class="dp-swatch" viewBox="0 0 22 8" aria-hidden="true">
+              <line x1="1" y1="4" x2="21" y2="4" stroke={l.color} stroke-width={l.naive ? 1 : 1.4}
+                stroke-dasharray={l.naive ? "3 2" : ""} opacity={l.naive ? 0.6 : 1} />
+            </svg>
+            <span>{l.label}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  ) : (
+    node.items.map((item) => <img src={item.svg ?? item.png} alt={`Figure ${node.number}`} loading="lazy" />)
+  )}
+
+  {(node.caption.length > 0 || num) && (
+    <figcaption>
+      {num && <span class="cap-label">Figure {num}.</span>}{" "}
+      <Inline nodes={preventWidow(node.caption)} footnotes={footnotes} />
+    </figcaption>
+  )}
+</figure>
+
+<style>
+  .dp-fig > .dp-app { grid-column: 2; grid-row: 1; min-width: 0; }
+  .dp-app { font-family: var(--sans); color: var(--ink); }
+  .dp-suptitle { text-align: center; font-weight: 700; font-size: 0.92rem; margin-bottom: 0.6rem; }
+  .dp-suptitle :global(.katex), .dp-title :global(.katex), .dp-ylabel :global(.katex) { font-size: 1em; }
+
+  .dp-grid { display: grid; grid-template-columns: repeat(var(--dp-cols), 1fr); gap: 0.5rem 0.6rem; }
+  .dp-panel { min-width: 0; }
+  .dp-title { text-align: center; font-weight: 700; font-size: 0.72rem; min-height: 0.9rem; }
+  .dp-plotrow { display: grid; grid-template-columns: 0.75rem 1fr; align-items: center; }
+  .dp-ylabel {
+    grid-column: 1; writing-mode: vertical-rl; transform: rotate(180deg);
+    text-align: center; font-size: 0.62rem; color: var(--muted); justify-self: center; white-space: nowrap;
+  }
+  .dp-svgbox { grid-column: 2; position: relative; min-width: 0; }
+  .dp-svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: none; }
+  .dp-xlabel { text-align: center; font-size: 0.62rem; color: var(--muted); margin-top: 0.05rem; }
+
+  .dp-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; justify-content: center; margin-top: 0.5rem; font-size: 0.76rem; }
+  .dp-legitem { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .dp-swatch { width: 22px; height: 8px; flex: none; }
+
+  @media (max-width: 900px) { .dp-fig > .dp-app { grid-column: 1; } }
+</style>
+
+<style is:global>
+  .dp-fig .dp-axis { stroke: #666; stroke-width: 0.5; }
+  .dp-fig .dp-tick { stroke: #666; stroke-width: 0.5; }
+  .dp-fig .dp-ticklbl { fill: var(--muted); font-size: 6px; font-variant-numeric: tabular-nums; }
+  .dp-fig .dp-fill { fill-opacity: 0.18; stroke: none; }
+  .dp-fig .dp-line { fill: none; stroke-width: 1; }
+  .dp-fig .dp-line-naive { fill: none; stroke-width: 0.8; stroke-dasharray: 3 2; opacity: 0.6; }
+  .dp-fig .dp-d { fill: #000; font-size: 5.5px; font-variant-numeric: tabular-nums; }
+  .dp-fig .dp-d-naive { fill: #999; }
+
+  .dp-fig .dp-tip {
+    position: absolute; z-index: 5; pointer-events: none; background: #fff;
+    border: 1px solid var(--rule); border-radius: 7px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 0.35rem 0.5rem; font-family: var(--sans); font-size: 0.74rem; line-height: 1.3;
+    color: var(--ink); white-space: nowrap;
+  }
+  .dp-fig .dp-tip-head { font-weight: 700; margin-bottom: 0.1rem; }
+  .dp-fig .dp-tip-row { display: flex; justify-content: space-between; gap: 0.8rem; }
+  .dp-fig .dp-tip-k { color: var(--muted); }
+  .dp-fig .dp-tip-v { font-variant-numeric: tabular-nums; }
+</style>
+
+<script is:inline>
+  (function () {
+    var MINUS = "−";
+    function fix(v, n) { var s = Math.abs(v).toFixed(n); return v < 0 ? MINUS + s : s; }
+
+    document.querySelectorAll(".dp-fig .dp-panel").forEach(function (panel) {
+      var dataEl = panel.querySelector(".dp-data");
+      if (!dataEl) return;
+      var D = JSON.parse(dataEl.textContent);
+      if (!D.points.length) return;
+      var svg = panel.querySelector(".dp-svg");
+      var box = panel.querySelector(".dp-svgbox");
+      var tip = panel.querySelector(".dp-tip");
+
+      function nearest(ev) {
+        var pt = svg.createSVGPoint();
+        pt.x = ev.clientX; pt.y = ev.clientY;
+        var ctm = svg.getScreenCTM();
+        if (!ctm) return null;
+        var loc = pt.matrixTransform(ctm.inverse());
+        var best = null, bd = Infinity;
+        for (var i = 0; i < D.points.length; i++) {
+          var p = D.points[i];
+          var dx = p.px - loc.x, dy = p.py - loc.y;
+          var d2 = dx * dx + dy * dy;
+          if (d2 < bd) { bd = d2; best = p; }
+        }
+        return bd <= 25 ? best : null;
+      }
+
+      function show(p, ev) {
+        var rect = box.getBoundingClientRect();
+        tip.hidden = false;
+        tip.innerHTML =
+          '<div class="dp-tip-head">' + p.label + "</div>" +
+          '<div class="dp-tip-row"><span class="dp-tip-k">std devs</span><span class="dp-tip-v">' + fix(p.x, 2) + "</span></div>" +
+          '<div class="dp-tip-row"><span class="dp-tip-k">density</span><span class="dp-tip-v">' + p.d.toFixed(3) + "</span></div>";
+        var tw = tip.offsetWidth, th = tip.offsetHeight;
+        var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        var tx = mx + 12, ty = my + 12;
+        if (tx + tw > rect.width) tx = mx - tw - 12;
+        if (ty + th > rect.height) ty = my - th - 12;
+        if (tx < 0) tx = 2;
+        if (ty < 0) ty = 2;
+        tip.style.left = tx + "px";
+        tip.style.top = ty + "px";
+      }
+      function hide() { tip.hidden = true; }
+
+      svg.addEventListener("pointermove", function (ev) {
+        var p = nearest(ev);
+        if (p) show(p, ev);
+        else hide();
+      });
+      svg.addEventListener("pointerleave", hide);
+    });
+  })();
+</script>
